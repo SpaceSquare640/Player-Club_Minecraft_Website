@@ -1,0 +1,101 @@
+// Canonical JSON output (scripts/lib/json-io.mjs).
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parseJsonText, stringifyJson } from "../../scripts/lib/json-io.mjs";
+import { createDictionaries } from "../fixtures/dataset.mjs";
+
+test("keys follow schema property order; primitive arrays stay on one line", () => {
+  const scrambled = {
+    points: [
+      {
+        updatedAt: "2026-09-29T08:00:00Z",
+        tags: ["village", "base"],
+        name: "Village 1",
+        id: "p0001",
+        z: 300,
+        y: null,
+        x: -426,
+        dimension: "overworld",
+        submittedBy: "SpaceSquare640",
+        createdAt: "2026-09-29T08:00:00Z",
+      },
+    ],
+    worldId: "player_club",
+    schemaVersion: 1,
+  };
+  const expected = [
+    "{",
+    '  "schemaVersion": 1,',
+    '  "worldId": "player_club",',
+    '  "points": [',
+    "    {",
+    '      "id": "p0001",',
+    '      "dimension": "overworld",',
+    '      "name": "Village 1",',
+    '      "tags": ["village", "base"],',
+    '      "x": -426,',
+    '      "y": null,',
+    '      "z": 300,',
+    '      "submittedBy": "SpaceSquare640",',
+    '      "createdAt": "2026-09-29T08:00:00Z",',
+    '      "updatedAt": "2026-09-29T08:00:00Z"',
+    "    }",
+    "  ]",
+    "}",
+    "",
+  ].join("\n");
+  assert.equal(stringifyJson(scrambled, "points"), expected);
+});
+
+test("localized text is written English first; nested $defs are followed", () => {
+  const text = stringifyJson(
+    {
+      entries: [
+        {
+          source: { type: "manual" },
+          scope: { "zh-TW": "全站", en: "Entire site" },
+          summary: { "zh-TW": "網站上線", en: "Site launched" },
+          target: { name: "A", dimension: "overworld", id: "p0001", worldId: "w1", type: "point" },
+          action: "add",
+          date: "2026-09-29",
+          id: "c0001",
+        },
+      ],
+      schemaVersion: 1,
+    },
+    "changelog-points",
+  );
+  const keys = [...text.matchAll(/"([A-Za-z-]+)":/g)].map((m) => m[1]);
+  assert.deepEqual(keys, [
+    "schemaVersion", "entries", "id", "date", "action", "target", "type", "worldId", "id", "dimension", "name",
+    "summary", "en", "zh-TW", "scope", "en", "zh-TW", "source", "type",
+  ]);
+  assert.ok(text.includes("網站上線"), "non-ASCII text is not escaped");
+});
+
+test("dictionary messages are sorted by key; unknown keys are kept at the end", () => {
+  const dict = createDictionaries().en;
+  dict.messages = { "world.version.latest": "b", "app.title": "a" };
+  const text = stringifyJson({ ...dict, extra: true }, "i18n");
+  assert.ok(text.indexOf('"app.title"') < text.indexOf('"world.version.latest"'));
+  assert.ok(text.trimEnd().endsWith('"extra": true\n}'));
+});
+
+test("output is LF-only with a single trailing newline; empty containers are compact", () => {
+  const text = stringifyJson({ schemaVersion: 1, vpns: [] }, "vpn");
+  assert.equal(text, '{\n  "schemaVersion": 1,\n  "vpns": []\n}\n');
+  assert.ok(!text.includes("\r"));
+});
+
+test("parseJsonText flags a BOM", () => {
+  assert.deepEqual(parseJsonText('{"a":1}'), { data: { a: 1 }, bom: false });
+  assert.deepEqual(parseJsonText('﻿{"a":1}'), { data: { a: 1 }, bom: true });
+  assert.throws(() => parseJsonText("{a:1}"), SyntaxError);
+});
+
+test("large seed strings survive a round trip unchanged", () => {
+  const worlds = { schemaVersion: 1, worlds: [{ id: "w1", seed: "-9223372036854775808" }] };
+  const back = parseJsonText(stringifyJson(worlds, "worlds")).data;
+  assert.equal(back.worlds[0].seed, "-9223372036854775808");
+  assert.equal(typeof back.worlds[0].seed, "string");
+});
