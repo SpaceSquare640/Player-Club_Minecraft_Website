@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:vpn",
+  "title": "vpn.json",
+  "description": "VPN template data. Passwords are never stored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "vpns"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "vpns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "networkName", "contactUrl", "worldIds"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "type": { "type": "string", "enum": ["radmin"] },
+          "networkName": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/plainText", "minLength": 1, "maxLength": 64 },
+          "contactUrl": { "$ref": "urn:player-club:v1:defs#/$defs/httpsUrl" },
+          "worldIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" }
+          }
+        }
+      }
+    }
+  }
+}

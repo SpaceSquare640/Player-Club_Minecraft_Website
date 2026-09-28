@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:config",
+  "title": "config.json",
+  "description": "Site settings, repository and approvers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "siteUrl", "discordInviteUrl", "repo", "defaultWorldId", "approvers", "changelogTimeZone"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "siteUrl": {
+      "type": "string",
+      "$ref": "urn:player-club:v1:defs#/$defs/httpsUrl",
+      "pattern": "/$"
+    },
+    "discordInviteUrl": {
+      "type": "string",
+      "pattern": "^https://discord\\.gg/[A-Za-z0-9-]+$"
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owner", "name", "branch"],
+      "properties": {
+        "owner": { "$ref": "urn:player-club:v1:defs#/$defs/githubLogin" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
+        "branch": { "type": "string", "pattern": "^(?!-)[A-Za-z0-9._/-]{1,100}$" }
+      }
+    },
+    "defaultWorldId": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+    "approvers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "urn:player-club:v1:defs#/$defs/githubLogin" }
+    },
+    "changelogTimeZone": {
+      "type": "string",
+      "format": "iana-time-zone"
+    }
+  }
+}

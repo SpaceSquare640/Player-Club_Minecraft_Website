@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:worlds",
+  "title": "worlds.json",
+  "description": "Worlds, including seed (int64 as string) and the required overworld spawn.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "worlds"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "worlds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "edition", "gameVersion", "seed", "spawn", "dimensions"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "name": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/plainText", "minLength": 1, "maxLength": 50 },
+          "edition": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "gameVersion": { "type": "string", "pattern": "^(latest|[0-9]+\\.[0-9]+(\\.[0-9]+)?)$" },
+          "seed": {
+            "description": "Signed 64-bit integer as a string; the int64 range is checked with BigInt by cross validation.",
+            "type": "string",
+            "pattern": "^(0|-?[1-9][0-9]{0,18})$"
+          },
+          "spawn": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y", "z"],
+            "properties": {
+              "x": { "type": "integer" },
+              "y": { "type": "integer" },
+              "z": { "type": "integer" }
+            }
+          },
+          "dimensions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": { "$ref": "urn:player-club:v1:defs#/$defs/dimension" }
+          }
+        }
+      }
+    }
+  }
+}

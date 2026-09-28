@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:tags",
+  "title": "tags.json",
+  "description": "Tag groups and tags with bilingual names. Array order is display order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "groups", "tags"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "name": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText30" }
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "group", "name", "dimensions"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "group": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "name": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText30" },
+          "hint": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText120" },
+          "dimensions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "urn:player-club:v1:defs#/$defs/dimension" }
+          },
+          "editions": {
+            "description": "Omit to allow every edition.",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" }
+          },
+          "retired": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

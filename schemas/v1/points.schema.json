@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:points",
+  "title": "points/<worldId>.json",
+  "description": "Points of one world, stored in ascending id order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "worldId", "points"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "worldId": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "dimension", "name", "tags", "x", "y", "z", "submittedBy", "createdAt", "updatedAt"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/pointId" },
+          "dimension": { "$ref": "urn:player-club:v1:defs#/$defs/dimension" },
+          "name": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/plainText", "minLength": 1, "maxLength": 60 },
+          "tags": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" }
+          },
+          "x": { "type": "integer" },
+          "y": { "type": ["integer", "null"] },
+          "z": { "type": "integer" },
+          "note": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/multilineText", "minLength": 1, "maxLength": 500 },
+          "submittedBy": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/plainText", "minLength": 1, "maxLength": 50 },
+          "createdAt": { "$ref": "urn:player-club:v1:defs#/$defs/utcTimestamp" },
+          "updatedAt": { "$ref": "urn:player-club:v1:defs#/$defs/utcTimestamp" }
+        }
+      }
+    }
+  }
+}

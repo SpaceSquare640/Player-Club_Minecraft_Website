@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:i18n",
+  "title": "i18n/<lang>.json",
+  "description": "Interface dictionary. Flat dotted keys, plain-text values with {name} placeholders.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "lang", "messages"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "lang": { "type": "string", "enum": ["zh-TW", "en"] },
+    "messages": {
+      "type": "object",
+      "propertyNames": { "type": "string", "pattern": "^[a-z][a-zA-Z0-9]*(\\.[a-z][a-zA-Z0-9_]*)+$" },
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 500 }
+    }
+  }
+}

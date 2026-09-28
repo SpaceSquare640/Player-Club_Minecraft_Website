@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:editions",
+  "title": "editions.json",
+  "description": "Game editions and coordinate bounds. Display names come from the dictionary key edition.<id>.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "editions"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "editions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "bounds"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "bounds": { "$ref": "urn:player-club:v1:defs#/$defs/bounds" },
+          "versionOverrides": {
+            "description": "Checked in order; the first override whose inclusive range contains the game version wins.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["bounds"],
+              "anyOf": [{ "required": ["minVersion"] }, { "required": ["maxVersion"] }],
+              "properties": {
+                "minVersion": { "$ref": "urn:player-club:v1:defs#/$defs/gameVersionNumber" },
+                "maxVersion": { "$ref": "urn:player-club:v1:defs#/$defs/gameVersionNumber" },
+                "bounds": { "$ref": "urn:player-club:v1:defs#/$defs/bounds" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:changelog-updates",
+  "title": "changelog/updates.json",
+  "description": "Site update entries (Change Log > Updates), appended in ascending id order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "date", "summary", "scope"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/updateId" },
+          "date": { "$ref": "urn:player-club:v1:defs#/$defs/calendarDate" },
+          "summary": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText200" },
+          "scope": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText100" }
+        }
+      }
+    }
+  }
+}

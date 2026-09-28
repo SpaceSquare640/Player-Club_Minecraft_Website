@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:changelog-points",
+  "title": "changelog/points.json",
+  "description": "Coordinate change entries (Change Log > Coordinate changes), appended in ascending id order. target.id is a soft reference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "date", "action", "target", "summary", "scope", "source"],
+      "properties": {
+        "id": { "$ref": "urn:player-club:v1:defs#/$defs/changeId" },
+        "date": { "$ref": "urn:player-club:v1:defs#/$defs/calendarDate" },
+        "action": { "type": "string", "enum": ["add", "edit", "delete"] },
+        "target": { "$ref": "#/$defs/target" },
+        "changedFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["name", "dimension", "tags", "x", "y", "z", "note"] }
+        },
+        "summary": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText200" },
+        "scope": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText100" },
+        "source": { "$ref": "#/$defs/source" }
+      },
+      "allOf": [
+        {
+          "description": "changedFields is required for edit and forbidden otherwise.",
+          "if": { "type": "object", "required": ["action"], "properties": { "action": { "const": "edit" } } },
+          "then": { "type": "object", "required": ["changedFields"] },
+          "else": { "type": "object", "properties": { "changedFields": false } }
+        },
+        {
+          "description": "A spawn target only allows action edit with changedFields limited to x, y, z.",
+          "if": {
+            "type": "object",
+            "required": ["target"],
+            "properties": {
+              "target": { "type": "object", "required": ["type"], "properties": { "type": { "const": "spawn" } } }
+            }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "action": { "const": "edit" },
+              "changedFields": { "type": "array", "items": { "type": "string", "enum": ["x", "y", "z"] } }
+            }
+          }
+        }
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "worldId"],
+      "properties": {
+        "type": { "type": "string", "enum": ["point", "spawn"] },
+        "worldId": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+        "id": { "$ref": "urn:player-club:v1:defs#/$defs/pointId" },
+        "dimension": { "$ref": "urn:player-club:v1:defs#/$defs/dimension" },
+        "name": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/plainText", "minLength": 1, "maxLength": 60 }
+      },
+      "if": { "type": "object", "properties": { "type": { "const": "point" } } },
+      "then": { "type": "object", "required": ["id", "dimension", "name"] },
+      "else": { "type": "object", "properties": { "id": false, "dimension": false, "name": false } }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["issue", "manual"] },
+        "issue": { "type": "integer", "minimum": 1 }
+      },
+      "if": { "type": "object", "properties": { "type": { "const": "issue" } } },
+      "then": { "type": "object", "required": ["issue"] },
+      "else": { "type": "object", "properties": { "issue": false } }
+    }
+  }
+}
