@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "groups": [
+    {
+      "id": "facility",
+      "name": {
+        "en": "Player facilities",
+        "zh-TW": "玩家設施"
+      }
+    },
+    {
+      "id": "structure",
+      "name": {
+        "en": "Structures",
+        "zh-TW": "天然結構"
+      }
+    },
+    {
+      "id": "misc",
+      "name": {
+        "en": "Miscellaneous",
+        "zh-TW": "其他"
+      }
+    }
+  ],
+  "tags": [
+    {
+      "id": "spawn",
+      "group": "facility",
+      "name": {
+        "en": "Spawn",
+        "zh-TW": "出生點"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "base",
+      "group": "facility",
+      "name": {
+        "en": "Base",
+        "zh-TW": "基地"
+      },
+      "dimensions": ["overworld", "the_nether", "the_end"]
+    },
+    {
+      "id": "farm",
+      "group": "facility",
+      "name": {
+        "en": "Farm",
+        "zh-TW": "農場"
+      },
+      "dimensions": ["overworld", "the_nether", "the_end"]
+    },
+    {
+      "id": "nether_portal",
+      "group": "facility",
+      "name": {
+        "en": "Nether Portal",
+        "zh-TW": "地獄傳送門"
+      },
+      "dimensions": ["overworld", "the_nether"]
+    },
+    {
+      "id": "village",
+      "group": "structure",
+      "name": {
+        "en": "Village",
+        "zh-TW": "村莊"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "stronghold",
+      "group": "structure",
+      "name": {
+        "en": "Stronghold",
+        "zh-TW": "要塞"
+      },
+      "hint": {
+        "en": "End Portal stronghold",
+        "zh-TW": "終界要塞"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "end_portal",
+      "group": "structure",
+      "name": {
+        "en": "End Portal",
+        "zh-TW": "終界傳送門"
+      },
+      "hint": {
+        "en": "Standing position directly facing the portal",
+        "zh-TW": "座標為抵達 X Y Z 時正面對傳送門的位置"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "ocean_monument",
+      "group": "structure",
+      "name": {
+        "en": "Ocean Monument",
+        "zh-TW": "海底神殿"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "woodland_mansion",
+      "group": "structure",
+      "name": {
+        "en": "Woodland Mansion",
+        "zh-TW": "林地府邸"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "ancient_city",
+      "group": "structure",
+      "name": {
+        "en": "Ancient City",
+        "zh-TW": "遠古城市"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "trial_chambers",
+      "group": "structure",
+      "name": {
+        "en": "Trial Chambers",
+        "zh-TW": "試煉密室"
+      },
+      "dimensions": ["overworld"]
+    },
+    {
+      "id": "spawner",
+      "group": "structure",
+      "name": {
+        "en": "Monster Spawner",
+        "zh-TW": "怪物生成器"
+      },
+      "dimensions": ["overworld", "the_nether"]
+    },
+    {
+      "id": "nether_fortress",
+      "group": "structure",
+      "name": {
+        "en": "Nether Fortress",
+        "zh-TW": "地獄要塞"
+      },
+      "dimensions": ["the_nether"]
+    },
+    {
+      "id": "bastion",
+      "group": "structure",
+      "name": {
+        "en": "Bastion Remnant",
+        "zh-TW": "堡壘遺跡"
+      },
+      "dimensions": ["the_nether"]
+    },
+    {
+      "id": "end_city",
+      "group": "structure",
+      "name": {
+        "en": "End City",
+        "zh-TW": "終界城"
+      },
+      "dimensions": ["the_end"]
+    },
+    {
+      "id": "biome",
+      "group": "misc",
+      "name": {
+        "en": "Biome",
+        "zh-TW": "生態域"
+      },
+      "dimensions": ["overworld", "the_nether", "the_end"]
+    },
+    {
+      "id": "other",
+      "group": "misc",
+      "name": {
+        "en": "Other",
+        "zh-TW": "其他"
+      },
+      "dimensions": ["overworld", "the_nether", "the_end"]
+    }
+  ]
+}

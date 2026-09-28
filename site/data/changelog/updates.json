@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "u0001",
+      "date": "2026-09-29",
+      "summary": {
+        "en": "Site launched: world info, coordinates and change log",
+        "zh-TW": "網站上線：世界資訊、座標與變更紀錄"
+      },
+      "scope": {
+        "en": "Entire site",
+        "zh-TW": "全站"
+      }
+    }
+  ]
+}

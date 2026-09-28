@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "vpns": [
+    {
+      "id": "kingsley_radmin",
+      "type": "radmin",
+      "networkName": "Kingsley_VPN_Room",
+      "contactUrl": "https://discord.com/users/958592363083743252",
+      "worldIds": ["player_club"]
+    }
+  ]
+}

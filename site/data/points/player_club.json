@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "worldId": "player_club",
+  "points": [
+    {
+      "id": "p0001",
+      "dimension": "overworld",
+      "name": "Village 1",
+      "tags": ["village"],
+      "x": -426,
+      "y": 72,
+      "z": 300,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-09-28T23:00:00Z",
+      "updatedAt": "2026-09-28T23:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "siteUrl": "https://spacesquare640.github.io/Player-Club_Minecraft_Website/",
+  "discordInviteUrl": "https://discord.gg/aaUQVJeCgC",
+  "repo": {
+    "owner": "SpaceSquare640",
+    "name": "Player-Club_Minecraft_Website",
+    "branch": "Source_Code"
+  },
+  "defaultWorldId": "player_club",
+  "approvers": ["SpaceSquare640"],
+  "changelogTimeZone": "Asia/Taipei"
+}
