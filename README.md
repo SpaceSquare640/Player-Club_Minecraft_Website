@@ -1,6 +1,89 @@
 # Player-Club Minecraft Website
 
-[繁體中文](#繁體中文) | [English](#english)
+[English](#english) | [繁體中文](#繁體中文)
+
+---
+
+## English
+
+A Minecraft world coordinate website for the Player Club community. It keeps coordinates of villages, strongholds, bases and more in one place, so friends can look them up, copy them and submit new ones.
+
+Website: https://spacesquare640.github.io/Player-Club_Minecraft_Website/
+
+> Under construction. The website is not live yet.
+
+### Features
+
+| Feature | Description |
+| --- | --- |
+| World info | World name, game version, seed and world spawn pinned at the top, each with one-click copy |
+| Dimension tabs | Overworld, The Nether, The End |
+| Point cards | Name, tags, X Y Z, note, submitter and last update; one-click copy of "X Y Z" |
+| Search and filter | Keyword search and tag filters; view state is stored in the URL for sharing |
+| Worlds and editions | Multiple worlds, Java Edition and Bedrock Edition, configured by data |
+| Bilingual UI | Traditional Chinese and English |
+| Connection info | Radmin VPN network name; the password is not published, please ask the creator |
+| Community | Discord community invite link |
+| Change Log | Site updates and coordinate changes |
+
+### Submitting and editing points
+
+All coordinate requests are submitted through GitHub Issue forms and are applied only after the owner approves them. The forms will open when the website goes live.
+
+| Form | Purpose |
+| --- | --- |
+| 新增座標 / Add a point | Add a new point |
+| 修改座標 / Edit a point | Edit an existing point (point id required) |
+| 刪除座標 / Delete a point | Delete an existing point (point id required) |
+| 修改世界出生座標 / Edit world spawn | Edit the world spawn (the world spawn cannot be deleted) |
+
+Process:
+
+1. Open a form from the [Issue form page](https://github.com/SpaceSquare640/Player-Club_Minecraft_Website/issues/new/choose) or the submit entry on the website. Edit and delete requests can be opened from the "⋯" menu on a point card, with the point id filled in automatically.
+2. After submission, the format is checked automatically and the result is posted as a comment. If there are errors, edit the issue to fix them and the check runs again.
+3. Once the owner approves, the data is written, a Change Log entry is added and the website is updated. A comment with the website link is posted and the issue is closed. The website may take a few minutes to show the update.
+4. If the owner closes the issue without approval, the request is declined.
+
+Notes:
+
+- One issue handles one point only.
+- Issues are public, and the submitter's GitHub username is shown on the point card.
+- Editing an issue after approval revokes the approval and requires a new review.
+
+No GitHub account: join the [Discord community](https://discord.gg/aaUQVJeCgC) and tell the owner, who will add the point for you.
+
+### Change Log
+
+This repository does not keep a separate change log file. Site updates and coordinate changes are recorded on the website's "Change Log" page, which has two sub-tabs, "Updates" and "Coordinate changes". Entries follow the format "Date - Description - Scope", with dates in Taipei time.
+
+### Project structure (planned)
+
+A static website (HTML, CSS, JavaScript) with no framework. Coordinates and other data are stored as JSON, separated from the UI, and every data file carries a `schemaVersion`. GitHub Actions validates issue requests, writes data and deploys to GitHub Pages.
+
+```text
+.github/        Issue forms and GitHub Actions workflows
+site/           Website (GitHub Pages root)
+  data/         JSON data: worlds, points, tags, change log
+  i18n/         Traditional Chinese and English UI dictionaries
+schemas/v1/     JSON Schema
+scripts/        Validation, issue processing and deployment scripts (Node.js)
+tests/          Unit tests
+```
+
+### Development
+
+In progress. Local setup, commands and the data maintenance workflow will be documented once the features are complete.
+
+### License
+
+© 2026 Kingsley. All rights reserved. The source code is publicly visible for reference only. Copying, modification, distribution or derivative works are not permitted without written permission. Third-party components remain under their own licenses. See [LICENSE](LICENSE).
+
+### Disclaimer
+
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
+Third-party trademarks in the community icon (such as Roblox, GTA and Rockstar) belong to their respective owners.
+
 
 ---
 
@@ -84,85 +167,3 @@ NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR 
 （非官方 Minecraft 產品，未經 Mojang 或 Microsoft 核准，亦與其無關。）
 
 社群 Icon 中的第三方商標（如 Roblox、GTA、Rockstar）歸各自所有者所有。
-
----
-
-## English
-
-A Minecraft world coordinate website for the Player Club community. It keeps coordinates of villages, strongholds, bases and more in one place, so friends can look them up, copy them and submit new ones.
-
-Website: https://spacesquare640.github.io/Player-Club_Minecraft_Website/
-
-> Under construction. The website is not live yet.
-
-### Features
-
-| Feature | Description |
-| --- | --- |
-| World info | World name, game version, seed and world spawn pinned at the top, each with one-click copy |
-| Dimension tabs | Overworld, The Nether, The End |
-| Point cards | Name, tags, X Y Z, note, submitter and last update; one-click copy of "X Y Z" |
-| Search and filter | Keyword search and tag filters; view state is stored in the URL for sharing |
-| Worlds and editions | Multiple worlds, Java Edition and Bedrock Edition, configured by data |
-| Bilingual UI | Traditional Chinese and English |
-| Connection info | Radmin VPN network name; the password is not published, please ask the creator |
-| Community | Discord community invite link |
-| Change Log | Site updates and coordinate changes |
-
-### Submitting and editing points
-
-All coordinate requests are submitted through GitHub Issue forms and are applied only after the owner approves them. The forms will open when the website goes live.
-
-| Form | Purpose |
-| --- | --- |
-| 新增座標 / Add a point | Add a new point |
-| 修改座標 / Edit a point | Edit an existing point (point id required) |
-| 刪除座標 / Delete a point | Delete an existing point (point id required) |
-| 修改世界出生座標 / Edit world spawn | Edit the world spawn (the world spawn cannot be deleted) |
-
-Process:
-
-1. Open a form from the [Issue form page](https://github.com/SpaceSquare640/Player-Club_Minecraft_Website/issues/new/choose) or the submit entry on the website. Edit and delete requests can be opened from the "⋯" menu on a point card, with the point id filled in automatically.
-2. After submission, the format is checked automatically and the result is posted as a comment. If there are errors, edit the issue to fix them and the check runs again.
-3. Once the owner approves, the data is written, a Change Log entry is added and the website is updated. A comment with the website link is posted and the issue is closed. The website may take a few minutes to show the update.
-4. If the owner closes the issue without approval, the request is declined.
-
-Notes:
-
-- One issue handles one point only.
-- Issues are public, and the submitter's GitHub username is shown on the point card.
-- Editing an issue after approval revokes the approval and requires a new review.
-
-No GitHub account: join the [Discord community](https://discord.gg/aaUQVJeCgC) and tell the owner, who will add the point for you.
-
-### Change Log
-
-This repository does not keep a separate change log file. Site updates and coordinate changes are recorded on the website's "Change Log" page, which has two sub-tabs, "Updates" and "Coordinate changes". Entries follow the format "Date - Description - Scope", with dates in Taipei time.
-
-### Project structure (planned)
-
-A static website (HTML, CSS, JavaScript) with no framework. Coordinates and other data are stored as JSON, separated from the UI, and every data file carries a `schemaVersion`. GitHub Actions validates issue requests, writes data and deploys to GitHub Pages.
-
-```text
-.github/        Issue forms and GitHub Actions workflows
-site/           Website (GitHub Pages root)
-  data/         JSON data: worlds, points, tags, change log
-  i18n/         Traditional Chinese and English UI dictionaries
-schemas/v1/     JSON Schema
-scripts/        Validation, issue processing and deployment scripts (Node.js)
-tests/          Unit tests
-```
-
-### Development
-
-In progress. Local setup, commands and the data maintenance workflow will be documented once the features are complete.
-
-### License
-
-© 2026 Kingsley. All rights reserved. The source code is publicly visible for reference only. Copying, modification, distribution or derivative works are not permitted without written permission. Third-party components remain under their own licenses. See [LICENSE](LICENSE).
-
-### Disclaimer
-
-NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
-
-Third-party trademarks in the community icon (such as Roblox, GTA and Rockstar) belong to their respective owners.
