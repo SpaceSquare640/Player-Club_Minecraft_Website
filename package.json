@@ -1,0 +1,25 @@
+{
+  "name": "player-club-minecraft-website",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static Minecraft coordinate website for the Player Club community.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node scripts/validate.mjs --coverage && node --test \"tests/**/*.test.mjs\"",
+    "check:ci": "node scripts/validate.mjs && node --test \"tests/**/*.test.mjs\"",
+    "validate": "node scripts/validate.mjs",
+    "format": "node scripts/validate.mjs --format",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "new-id": "node scripts/new-id.mjs",
+    "changelog:sync": "node scripts/changelog-sync.mjs",
+    "changelog:update": "node scripts/changelog-update.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  }
+}
