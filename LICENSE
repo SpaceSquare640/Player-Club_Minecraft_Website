@@ -1,0 +1,80 @@
+Player-Club Minecraft Website
+
+Copyright (c) 2026 Kingsley. All rights reserved.
+
+The English text below is the governing version. A Traditional Chinese
+translation follows for reference.
+
+--------------------------------------------------------------------------------
+ENGLISH
+--------------------------------------------------------------------------------
+
+1. All Rights Reserved
+
+The source code, design, text and images in this repository (the "Work")
+are owned by the copyright holder. The source code is made publicly visible
+for reference only. No license is granted. Without prior written permission
+from the copyright holder, you may not copy, modify, distribute, publish,
+sublicense or create derivative works of the Work, in whole or in part.
+
+2. GitHub Terms of Service
+
+Because this repository is public on GitHub, the GitHub Terms of Service
+allow GitHub users to view and fork it on GitHub through GitHub's
+functionality. That permission is limited to what those terms provide and
+grants no other rights. In particular, it does not permit using, modifying
+or distributing the Work outside GitHub.
+
+3. Minecraft Disclaimer
+
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG
+OR MICROSOFT.
+
+4. Third-Party Trademarks
+
+Third-party trademarks and logos shown in the community icon, such as
+Roblox, GTA and Rockstar, belong to their respective owners.
+
+5. Third-Party Notices
+
+This repository will include the following third-party components. They
+remain under their own licenses and are not subject to Section 1. The full
+license text of each component will be included when the related files are
+added.
+
+  - UI Verse components (https://uiverse.io/), MIT License
+  - Tabler Icons (https://tabler.io/icons), MIT License
+
+--------------------------------------------------------------------------------
+繁體中文（對照譯文，如有歧義以英文版本為準）
+--------------------------------------------------------------------------------
+
+1. 保留所有權利
+
+本 repo 內的原始碼、設計、文字與圖像（以下稱「本作品」）之權利歸版權持有人
+所有。原始碼公開僅供參考，不授予任何授權。未經版權持有人事先書面同意，不得
+全部或部分複製、修改、散布、發布、再授權本作品或據以二次創作。
+
+2. GitHub 服務條款
+
+由於本 repo 於 GitHub 上公開，依 GitHub 服務條款，GitHub 使用者得透過 GitHub
+的功能於 GitHub 上瀏覽及 fork 本 repo。該許可僅限於服務條款所規定之範圍，不
+授予其他任何權利；特別是不得於 GitHub 以外使用、修改或散布本作品。
+
+3. Minecraft 非官方聲明
+
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG
+OR MICROSOFT.
+（非官方 Minecraft 產品，未經 Mojang 或 Microsoft 核准，亦與其無關。）
+
+4. 第三方商標
+
+社群 Icon 中的第三方商標與標誌（如 Roblox、GTA、Rockstar）歸各自所有者所有。
+
+5. 第三方元件聲明
+
+本 repo 將收錄下列第三方元件，其仍受各自授權約束，不適用第 1 條。各元件的完
+整授權文字將於加入相關檔案時附上。
+
+  - UI Verse 元件（https://uiverse.io/），MIT 授權
+  - Tabler Icons（https://tabler.io/icons），MIT 授權
