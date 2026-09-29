@@ -17,14 +17,14 @@
     {
       "id": "p0002",
       "dimension": "overworld",
-      "name": "Cave Base",
+      "name": "Base 1",
       "tags": ["base"],
       "x": -64,
       "y": 88,
       "z": -4,
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-09-29T10:28:41Z",
-      "updatedAt": "2026-09-29T10:28:41Z"
+      "updatedAt": "2026-09-29T15:17:21Z"
     },
     {
       "id": "p0003",
