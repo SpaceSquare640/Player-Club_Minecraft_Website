@@ -1,0 +1,244 @@
+/* Base styles and page layout. Values come from css/tokens.css. */
+
+/* Canvas colour outside the app root (overscroll areas) mirrors --pc-color-bg, and the scroll
+   padding equals header 64 + tabs 52 + 16 px, because tokens are scoped to .pc-app. Cards also set
+   scroll-margin-top from the tokens. */
+html {
+  background-color: #05070d;
+  scroll-padding-top: 132px;
+}
+
+body {
+  margin: 0;
+}
+
+.pc-app,
+.pc-app *,
+.pc-app *::before,
+.pc-app *::after {
+  box-sizing: border-box;
+}
+
+.pc-app {
+  --pc-scroll-offset: calc(var(--pc-header-h) + var(--pc-tabs-h) + var(--pc-space-4));
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--pc-color-bg);
+  color: var(--pc-color-text);
+  font: 400 var(--pc-fs-base) / var(--pc-lh-body) var(--pc-font-sans);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.pc-app [hidden] {
+  display: none !important;
+}
+
+.pc-app h1,
+.pc-app h2,
+.pc-app h3,
+.pc-app p,
+.pc-app ol,
+.pc-app ul,
+.pc-app dl,
+.pc-app dd,
+.pc-app figure {
+  margin: 0;
+}
+
+.pc-app button,
+.pc-app input,
+.pc-app select {
+  font: inherit;
+  color: inherit;
+}
+
+.pc-app button {
+  cursor: pointer;
+}
+
+.pc-app img {
+  display: block;
+  max-width: 100%;
+}
+
+.pc-app a {
+  color: var(--pc-color-primary);
+}
+
+.pc-app :focus-visible {
+  outline: 2px solid var(--pc-color-focus);
+  outline-offset: 2px;
+}
+
+.pc-app h1:focus,
+.pc-app h2:focus,
+.pc-app h3:focus {
+  outline: none;
+}
+
+.pc-app h1:focus-visible,
+.pc-app h2:focus-visible,
+.pc-app h3:focus-visible {
+  outline: 2px solid var(--pc-color-focus);
+}
+
+.pc-mono {
+  font-family: var(--pc-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.pc-sentinel {
+  height: 1px;
+  margin-bottom: -1px;
+  pointer-events: none;
+}
+
+/* Container */
+.pc-container {
+  width: 100%;
+  max-width: var(--pc-container-max);
+  margin-inline: auto;
+  padding-inline: max(var(--pc-gutter), env(safe-area-inset-left)) max(var(--pc-gutter), env(safe-area-inset-right));
+}
+
+/* Skip link (a button: in-page #id anchors are reserved for the state hash) */
+.pc-skip {
+  position: fixed;
+  top: var(--pc-space-2);
+  left: var(--pc-space-2);
+  z-index: var(--pc-z-toast);
+  min-height: var(--pc-target-min);
+  padding: 0 var(--pc-space-4);
+  color: var(--pc-color-text-on-accent);
+  font-weight: 600;
+  background: var(--pc-color-primary);
+  border: 0;
+  border-radius: var(--pc-radius-pill);
+  transform: translateY(calc(-100% - var(--pc-space-4)));
+}
+
+.pc-skip:focus-visible {
+  transform: none;
+  outline-color: var(--pc-color-text);
+}
+
+/* Main area */
+.pc-main {
+  flex: 1 0 auto;
+  padding-bottom: var(--pc-space-8);
+}
+
+@media (min-width: 768px) {
+  .pc-main {
+    padding-bottom: var(--pc-space-12);
+  }
+}
+
+/* Coordinates page grid: DOM order world, aside, main (the visual order matches the focus order). */
+.pc-page--points {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "world"
+    "aside"
+    "main";
+  column-gap: var(--pc-space-6);
+}
+
+.pc-worldbar {
+  grid-area: world;
+}
+
+.pc-aside {
+  grid-area: aside;
+  display: grid;
+  gap: var(--pc-section-gap);
+  align-content: start;
+  margin-bottom: var(--pc-section-gap);
+}
+
+.pc-maincol {
+  grid-area: main;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .pc-aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .pc-aside > :only-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pc-page--points {
+    grid-template-columns: minmax(0, 1fr) var(--pc-sidebar-w);
+    grid-template-areas:
+      "world world"
+      "main aside";
+    align-items: start;
+  }
+
+  .pc-aside {
+    position: sticky;
+    top: calc(var(--pc-header-h) + var(--pc-space-4));
+    z-index: 1;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--pc-space-4);
+    max-height: calc(100dvh - var(--pc-header-h) - var(--pc-space-8));
+    margin-bottom: 0;
+    padding: 2px;
+    margin-inline: -2px;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+}
+
+/* Change log page */
+.pc-page--changelog {
+  max-width: var(--pc-changelog-max);
+  padding-top: var(--pc-space-6);
+}
+
+@media (max-width: 767px) {
+  .pc-page--changelog {
+    padding-top: var(--pc-space-4);
+  }
+}
+
+/* Motion reduction, forced colours, reduced transparency */
+@media (prefers-reduced-motion: reduce) {
+  .pc-app *,
+  .pc-app *::before,
+  .pc-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pc-header {
+    background: var(--pc-color-bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

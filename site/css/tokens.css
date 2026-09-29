@@ -1,0 +1,172 @@
+/* Player Club design tokens v2 - 2026-09-29
+   Tokens live on the application root (.pc-app), not :root, so the app can later be embedded in
+   another site without clashing with the host styles. Every colour, spacing, radius, shadow, size
+   and motion value used by base.css and components.css comes from here. */
+
+.pc-app {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --pc-color-bg: #05070d;
+  --pc-color-surface: #0f1320;
+  --pc-color-surface-raised: #151b2c;
+  --pc-color-surface-sunken: #0a0d17;
+  --pc-color-header: rgba(5, 7, 13, 0.85);
+  --pc-color-overlay: rgba(5, 7, 13, 0.72);
+  --pc-color-tabs-stuck: rgba(5, 7, 13, 0.92);
+
+  /* Borders */
+  --pc-color-border-subtle: #1e2640;
+  --pc-color-border: #2a3350;
+  --pc-color-border-strong: #5b6a91;
+  --pc-color-border-hover: #7a89b0;
+  --pc-color-pinned-border: rgba(56, 217, 255, 0.4);
+  --pc-color-chip-border: rgba(56, 217, 255, 0.28);
+  --pc-color-chip-border-hover: rgba(56, 217, 255, 0.6);
+  --pc-color-community-border: rgba(180, 108, 255, 0.5);
+  --pc-color-danger-border: rgba(255, 92, 122, 0.4);
+
+  /* Text */
+  --pc-color-text: #e6f0ff;
+  --pc-color-text-muted: #9aa7c4;
+  --pc-color-text-disabled: #5a6480;
+  --pc-color-text-on-accent: #05070d;
+
+  /* Role colours: cyan = interaction and state, purple = Discord only, green = success only,
+     red = errors and deletion only */
+  --pc-color-primary: #38d9ff;
+  --pc-color-primary-hover: #6be3ff;
+  --pc-color-primary-active: #1fc3ea;
+  --pc-color-secondary: #b46cff;
+  --pc-color-secondary-hover: #c68cff;
+  --pc-color-success: #3dffb0;
+  --pc-color-danger: #ff5c7a;
+  --pc-color-focus: #38d9ff;
+
+  /* Translucent tints */
+  --pc-tint-neutral: rgba(230, 240, 255, 0.06);
+  --pc-tint-neutral-hover: rgba(230, 240, 255, 0.1);
+  --pc-tint-primary: rgba(56, 217, 255, 0.12);
+  --pc-tint-primary-strong: rgba(56, 217, 255, 0.22);
+  --pc-tint-secondary: rgba(180, 108, 255, 0.14);
+  --pc-tint-secondary-strong: rgba(180, 108, 255, 0.22);
+  --pc-tint-success: rgba(61, 255, 176, 0.12);
+  --pc-tint-danger: rgba(255, 92, 122, 0.12);
+
+  /* Glows (state only), shadows (tinted with the background hue), edge highlight */
+  --pc-glow-primary: 0 0 12px rgba(56, 217, 255, 0.45);
+  --pc-glow-primary-soft: 0 0 8px rgba(56, 217, 255, 0.25);
+  --pc-glow-success: 0 0 12px rgba(61, 255, 176, 0.45);
+  --pc-shadow-inset: inset 0 2px 4px rgba(2, 4, 10, 0.5);
+  --pc-shadow-popover: 0 12px 32px rgba(2, 4, 10, 0.72);
+  --pc-edge-highlight: inset 0 1px 0 rgba(230, 240, 255, 0.06);
+  --pc-gradient-brand: linear-gradient(90deg, #38d9ff, #b46cff); /* wordmark only */
+  --pc-gradient-skeleton: linear-gradient(90deg, #0f1320, #151b2c, #0f1320);
+  --pc-mask-fade-x: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+
+  /* Type (5 sizes) */
+  --pc-font-sans: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --pc-font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Noto Sans Mono", monospace;
+  --pc-fs-xs: 0.75rem;
+  --pc-fs-sm: 0.875rem;
+  --pc-fs-base: 1rem;
+  --pc-fs-lg: 1.25rem;
+  --pc-fs-xl: 1.5rem;
+  --pc-fs-wordmark: 1rem;
+  --pc-fs-compact: 0.8125rem; /* Discord entry text below 768 px */
+  --pc-lh-xs: 1.5;
+  --pc-lh-sm: 1.5714;
+  --pc-lh-lg: 1.4;
+  --pc-lh-xl: 1.3333;
+  --pc-lh-tight: 1.3;
+  --pc-lh-body: 1.5;
+  --pc-lh-note: 1.6;
+  --pc-measure: 65ch;
+
+  /* Spacing (7 steps) */
+  --pc-space-1: 4px;
+  --pc-space-2: 8px;
+  --pc-space-3: 12px;
+  --pc-space-4: 16px;
+  --pc-space-6: 24px;
+  --pc-space-8: 32px;
+  --pc-space-12: 48px;
+
+  /* Radius (the only radius system) */
+  --pc-radius-inner: 6px;
+  --pc-radius-control: 10px;
+  --pc-radius-container: 16px;
+  --pc-radius-pill: 999px;
+
+  /* Layout */
+  --pc-target-min: 44px;
+  --pc-header-h: 56px;
+  --pc-tabs-h: 52px;
+  --pc-sidebar-w: 320px;
+  --pc-container-max: 1320px;
+  --pc-changelog-max: 960px;
+  --pc-panel-max: 560px;
+  --pc-menu-min: 180px;
+  --pc-dialog-w: 480px;
+  --pc-toast-w: 360px;
+  --pc-panel-pad: 16px;
+  --pc-section-gap: 16px;
+  --pc-gutter: 12px;
+  --pc-card-cols: 1;
+  --pc-icon-size: 20px;
+
+  /* Layers */
+  --pc-z-sticky: 90;
+  --pc-z-header: 100;
+  --pc-z-popover: 200;
+  --pc-z-dialog: 300;
+  --pc-z-toast: 400;
+
+  /* Motion */
+  --pc-dur-instant: 80ms;
+  --pc-dur-fast: 140ms;
+  --pc-dur-base: 200ms;
+  --pc-dur-slow: 280ms;
+  --pc-dur-feedback: 2000ms;
+  --pc-dur-toast: 4000ms;
+  --pc-dur-skeleton: 1600ms;
+  --pc-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --pc-ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --pc-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --pc-ease-emphasized: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pc-app:lang(zh-TW) {
+  --pc-lh-body: 1.7;
+}
+
+@media (min-width: 360px) {
+  .pc-app {
+    --pc-gutter: 16px;
+  }
+}
+
+@media (min-width: 768px) {
+  .pc-app {
+    --pc-gutter: 24px;
+    --pc-header-h: 64px;
+    --pc-card-cols: 2;
+    --pc-fs-xl: 1.75rem;
+    --pc-lh-xl: 1.2857;
+    --pc-fs-wordmark: 1.25rem;
+    --pc-panel-pad: 24px;
+    --pc-section-gap: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pc-app {
+    --pc-gutter: 32px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .pc-app {
+    --pc-card-cols: 3;
+  }
+}
