@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "check": "node scripts/validate.mjs --coverage && node --test \"tests/**/*.test.mjs\"",
+    "check": "node scripts/validate.mjs --coverage && node scripts/gen-issue-forms.mjs --check && node --test \"tests/**/*.test.mjs\"",
     "check:ci": "node scripts/validate.mjs && node --test \"tests/**/*.test.mjs\"",
     "validate": "node scripts/validate.mjs",
     "format": "node scripts/validate.mjs --format",
@@ -17,6 +17,7 @@
     "new-id": "node scripts/new-id.mjs",
     "changelog:sync": "node scripts/changelog-sync.mjs",
     "changelog:update": "node scripts/changelog-update.mjs",
+    "gen:forms": "node scripts/gen-issue-forms.mjs",
     "serve": "node scripts/serve.mjs"
   },
   "devDependencies": {
