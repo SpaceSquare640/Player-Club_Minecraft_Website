@@ -15,8 +15,9 @@
 //   Label and comment changes happen only after the push succeeded (or when nothing was committed), so a
 //   scan that is thrown away leaves no trace. Outputs: needs_deploy, results (JSON), head_sha.
 // report (job report): after the deployment, applied Issues get a comment with the site link, the applied
-//   label and are closed (success, or cancelled because a newer deployment superseded it); when the
-//   deployment failed they get deploy-failed and keep approved, so the next scan deploys again.
+//   label and are closed, but only when the deployment succeeded. A cancelled deployment (replaced by a
+//   newer one, or the run was cancelled) only gets a comment; a failed one also gets deploy-failed. Both
+//   keep approved and stay open, so the next scan deploys again and closes them.
 // Local: node scripts/apply-requests.mjs --event <event.json> --dry-run   (prints what would be written)
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -47,6 +48,7 @@ import { CORE_FILES, REPO_ROOT, createFsReader, loadDataset, pathOf, pointsPath 
 import {
   problemText,
   renderAppliedComment,
+  renderDeployCancelledComment,
   renderDeployFailedComment,
   renderRejectedComment,
   renderStaleComment,
@@ -438,7 +440,9 @@ export async function report({ github, context, core, env = process.env, root = 
   try {
     const repo = repoOf(context, env);
     const deployResult = String(env.DEPLOY_RESULT ?? "");
-    const deployed = deployResult === "success" || deployResult === "cancelled";
+    // Only a deployment that finished counts as published; anything else leaves the Issues open.
+    const deployed = deployResult === "success";
+    const cancelled = deployResult === "cancelled";
     const results = parseResults(env.APPLY_RESULTS).filter((r) => REPORTED_STATUSES.includes(r.status));
     const config = await loadConfig(reader ?? createFsReader(root));
     let failures = 0;
@@ -450,11 +454,13 @@ export async function report({ github, context, core, env = process.env, root = 
           await removeLabel(github, repo, r.issue, LABELS.pendingReview);
           await removeLabel(github, repo, r.issue, LABELS.deployFailed);
           await closeIssue(github, repo, r.issue);
+        } else if (cancelled) {
+          await createComment(github, repo, r.issue, renderDeployCancelledComment());
         } else {
           await addLabels(github, repo, r.issue, [LABELS.deployFailed]);
           await createComment(github, repo, r.issue, renderDeployFailedComment());
         }
-        log(`Issue #${r.issue}: ${deployed ? "closed as applied" : "marked deploy-failed"}`);
+        log(`Issue #${r.issue}: ${deployed ? "closed as applied" : cancelled ? "left open (deployment cancelled)" : "marked deploy-failed"}`);
       } catch (error) {
         failures += 1;
         log(`Issue #${r.issue}: report failed: ${describeError(error)}`);

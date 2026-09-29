@@ -600,35 +600,56 @@ async function runReport(deployResult, results, { entries } = {}) {
   return { outcome, gh, infos };
 }
 
-test("report: a successful or superseded deployment comments the link, labels applied and closes", async () => {
-  for (const result of ["success", "cancelled"]) {
-    const results = [
-      { issue: 12, status: "applied", kind: "add", pointId: "p0003", worldId: "player_club" },
-      { issue: 13, status: "stale", reason: "hashMismatch" },
-    ];
-    const { outcome, gh } = await runReport(result, results);
-    assert.deepEqual(outcome, { deployed: true, reported: 1 });
-    assert.deepEqual(gh.mutations(), [
-      ["createComment", 12],
-      ["addLabels", 12, "applied"],
-      ["removeLabel", 12, "pending-review"],
-      ["removeLabel", 12, "deploy-failed"],
-      ["update", 12, "closed", "completed"],
-    ]);
-    const comment = lastComment(gh, 12);
-    assert.ok(comment.includes("https://spacesquare640.github.io/Player-Club_Minecraft_Website/#point=p0003"));
-    assert.ok(comment.includes("about 10 minutes"));
-    assert.ok(gh.get(12).labels.has("approved"), "the approval stays as a record");
-  }
+test("report: a successful deployment comments the link, labels applied and closes", async () => {
+  const results = [
+    { issue: 12, status: "applied", kind: "add", pointId: "p0003", worldId: "player_club" },
+    { issue: 13, status: "stale", reason: "hashMismatch" },
+  ];
+  const { outcome, gh, infos } = await runReport("success", results);
+  assert.deepEqual(outcome, { deployed: true, reported: 1 });
+  assert.deepEqual(gh.mutations(), [
+    ["createComment", 12],
+    ["addLabels", 12, "applied"],
+    ["removeLabel", 12, "pending-review"],
+    ["removeLabel", 12, "deploy-failed"],
+    ["update", 12, "closed", "completed"],
+  ]);
+  const comment = lastComment(gh, 12);
+  assert.ok(comment.includes("https://spacesquare640.github.io/Player-Club_Minecraft_Website/#point=p0003"));
+  assert.ok(comment.includes("about 10 minutes"));
+  assert.ok(gh.get(12).labels.has("approved"), "the approval stays as a record");
+  assert.ok(infos.includes("Issue #12: closed as applied"));
 });
 
-test("report: a failed deployment adds deploy-failed, keeps approved and leaves the Issue open", async () => {
-  const { outcome, gh } = await runReport("failure", [{ issue: 12, status: "already-applied" }]);
-  assert.deepEqual(outcome, { deployed: false, reported: 1 });
-  assert.deepEqual(gh.mutations(), [["addLabels", 12, "deploy-failed"], ["createComment", 12]]);
-  assert.equal(gh.get(12).state, "open");
-  assert.ok(gh.get(12).labels.has("approved"));
-  assert.ok(lastComment(gh, 12).includes("Publishing failed"));
+test("report: a cancelled deployment is not treated as published; the Issue stays open with approved", async () => {
+  const { outcome, gh, infos } = await runReport("cancelled", [
+    { issue: 12, status: "applied", kind: "add", pointId: "p0003", worldId: "player_club" },
+    { issue: 14, status: "already-applied" },
+  ]);
+  assert.deepEqual(outcome, { deployed: false, reported: 2 });
+  assert.deepEqual(gh.mutations(), [["createComment", 12], ["createComment", 14]], "no applied label, no deploy-failed, not closed");
+  for (const n of [12, 14]) {
+    assert.equal(gh.get(n).state, "open");
+    assert.ok(gh.get(n).labels.has("approved"), "the next scan deploys again and closes it");
+    assert.ok(!gh.get(n).labels.has("applied"));
+    const lines = lastComment(gh, n).split("\n");
+    assert.equal(lines[1], "### Publishing cancelled / 發布已取消");
+    assert.match(lines[3], /^The request was written to the data, but publishing the site was cancelled/, "English first");
+    assert.match(lines[4], /^請求已寫入資料，但網站發布在完成前已取消/, "Traditional Chinese second");
+    assert.ok(!lines.join("\n").includes("https://"), "no site link: the change is not confirmed to be published");
+  }
+  assert.ok(infos.includes("Issue #12: left open (deployment cancelled)"));
+});
+
+test("report: a failed (or unknown) deployment adds deploy-failed, keeps approved and leaves the Issue open", async () => {
+  for (const result of ["failure", ""]) {
+    const { outcome, gh } = await runReport(result, [{ issue: 12, status: "already-applied" }]);
+    assert.deepEqual(outcome, { deployed: false, reported: 1 }, result);
+    assert.deepEqual(gh.mutations(), [["addLabels", 12, "deploy-failed"], ["createComment", 12]], result);
+    assert.equal(gh.get(12).state, "open");
+    assert.ok(gh.get(12).labels.has("approved"));
+    assert.ok(lastComment(gh, 12).includes("Publishing failed"));
+  }
 });
 
 test("report: a failed Issue update fails the job after the others were handled", async () => {
@@ -662,6 +683,7 @@ test("result comments are bilingual, English first, and contain no internal info
   bodies.push(lastComment(unauthorized.gh, 12));
   bodies.push(lastComment((await runReport("success", [{ issue: 12, status: "applied", kind: "add", pointId: "p0003", worldId: "player_club" }])).gh, 12));
   bodies.push(lastComment((await runReport("failure", [{ issue: 12, status: "applied" }])).gh, 12));
+  bodies.push(lastComment((await runReport("cancelled", [{ issue: 12, status: "applied" }])).gh, 12));
   for (const body of bodies) {
     assert.ok(body.startsWith(`${RESULT_MARKER}\n### `));
     assert.match(body.split("\n")[1], /^### [A-Za-z ]+ \/ \S+$/, "English title first");
