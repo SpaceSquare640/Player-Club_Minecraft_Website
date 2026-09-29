@@ -125,9 +125,19 @@
     "world.spawn": "World spawn",
     "world.spawn.copied": "Copied world spawn: {value}",
     "world.spawn.copy": "Copy world spawn coordinates",
+    "world.spawnRadius": "Respawn radius",
+    "world.spawnRadius.value.one": "{n} block",
+    "world.spawnRadius.value.other": "{n} blocks",
     "world.switch": "Switch world",
+    "world.type": "World type",
     "world.version": "Version",
     "world.version.fixed": "{edition} {version}",
-    "world.version.latest": "{edition} · Latest release"
+    "world.version.latest": "{edition} · Latest release",
+    "worldType.amplified": "Amplified",
+    "worldType.custom": "Custom",
+    "worldType.default": "Default",
+    "worldType.large_biomes": "Large Biomes",
+    "worldType.single_biome": "Single Biome",
+    "worldType.superflat": "Superflat"
   }
 }

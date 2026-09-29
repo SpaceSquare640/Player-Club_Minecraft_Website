@@ -1,17 +1,29 @@
-// World info panel: version, seed and world spawn, each copyable. It depends only on the current
-// world and language (never on search, tags, sorting or the dimension) and is never collapsed.
+// World info panel: version, optional world type, seed, world spawn and optional respawn radius.
+// Seed and spawn are copyable. It depends only on the current world and language (never on search,
+// tags, sorting or the dimension) and is never collapsed. Optional groups render only when the world
+// has the value.
 
-import { t } from "../i18n.js";
+import { plural, t, textLang } from "../i18n.js";
 import { formatCopyText } from "../lib/coords.js";
 import { createCopyButton, createFallbackHost } from "./copy.js";
 import { renderCoords } from "./coords-block.js";
 import { h } from "./dom.js";
-import { versionLabel } from "./model.js";
+import { spawnRadiusLabel, versionLabel, worldTypeKey } from "./model.js";
 
 /** Version badge text, for example "Java Edition · Latest release". */
 export function versionText(world) {
   const label = versionLabel(world);
   return t(label.key, { ...label.params, edition: t(label.editionKey) });
+}
+
+/** A read-only group: plain label and a text value (no copy button). */
+function plainGroup(label, value, valueClass = "") {
+  return h(
+    "div",
+    { className: "pc-worldinfo__group" },
+    h("dt", { className: "pc-worldinfo__label pc-worldinfo__label--plain", text: label }),
+    h("dd", {}, h("span", { className: `pc-worldinfo__value ${valueClass}`.trim(), text: value })),
+  );
 }
 
 /**
@@ -29,6 +41,10 @@ export function renderWorldInfo(world, { scope }) {
       h("dd", {}, h("span", { className: "pc-badge", text: versionText(world) })),
     ),
   ];
+
+  // A type without a dictionary entry is skipped rather than shown as a raw key.
+  const typeKey = worldTypeKey(world);
+  if (typeKey && textLang(typeKey)) groups.push(plainGroup(t("world.type"), t(typeKey)));
 
   // The seed stays a string end to end (int64 values do not fit in a JS number).
   if (typeof world.seed === "string" && world.seed !== "") {
@@ -78,6 +94,11 @@ export function renderWorldInfo(world, { scope }) {
         h("dd", {}, renderCoords(world.spawn, { small: true }), fallback),
       ),
     );
+  }
+
+  const radius = spawnRadiusLabel(world);
+  if (radius) {
+    groups.push(plainGroup(t("world.spawnRadius"), plural(radius.key, radius.n), "pc-worldinfo__value--num"));
   }
 
   return h(

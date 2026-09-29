@@ -346,6 +346,15 @@ test("X19 dictionaries: en is primary, placeholders match, data ids are covered"
     "Missing dictionary keys vpn.radmin.*",
   ]);
 
+  // Only the world types in use need a name; a type without one is an error.
+  const worldType = withDictionaries();
+  assert.deepEqual(errors(run(worldType), "X19"), [], "no world uses a type yet");
+  worldType.worlds.worlds[0].worldType = "superflat";
+  assert.deepEqual(errors(run(worldType), "X19").map((e) => e.message), ["Missing dictionary key worldType.superflat"]);
+  worldType.i18n.en.messages["worldType.superflat"] = "Superflat";
+  worldType.i18n["zh-TW"].messages["worldType.superflat"] = "超平坦";
+  assert.deepEqual(errors(run(worldType), "X19"), []);
+
   const missingFile = withDictionaries();
   delete missingFile.i18n["zh-TW"];
   assert.match(errors(run(missingFile), "X19")[0].message, /missing/);

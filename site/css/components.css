@@ -815,6 +815,16 @@
   overflow-wrap: anywhere;
 }
 
+/* Read-only values without a copy button (world type, respawn radius). */
+.pc-worldinfo__value {
+  font: 500 var(--pc-fs-base) / 1.625 var(--pc-font-sans);
+  overflow-wrap: anywhere;
+}
+
+.pc-worldinfo__value--num {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------------------------------------------------------------- Radmin VPN */
 .pc-vpn {
   min-width: 0;

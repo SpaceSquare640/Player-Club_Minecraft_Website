@@ -16,8 +16,10 @@ import {
   pageEntries,
   pointDateMeta,
   resultSummary,
+  spawnRadiusLabel,
   tagsForDimension,
   versionLabel,
+  worldTypeKey,
   zonedDateTime,
 } from "../../site/js/ui/model.js";
 import { ISSUE_KINDS, buildNewIssueUrl } from "../../site/js/lib/issue-links.js";
@@ -155,6 +157,19 @@ test("keyboard navigation wraps around", () => {
 test("version label", () => {
   assert.deepEqual(versionLabel({ edition: "java", gameVersion: "latest" }), { key: "world.version.latest", editionKey: "edition.java", params: {} });
   assert.deepEqual(versionLabel({ edition: "bedrock", gameVersion: "1.21.2" }), { key: "world.version.fixed", editionKey: "edition.bedrock", params: { version: "1.21.2" } });
+});
+
+test("optional world type and respawn radius: shown only when present and well formed", () => {
+  assert.equal(worldTypeKey({ worldType: "superflat" }), "worldType.superflat");
+  assert.equal(worldTypeKey({ worldType: "large_biomes" }), "worldType.large_biomes");
+  for (const world of [{}, { worldType: "" }, { worldType: "Superflat" }, { worldType: "a.b" }, { worldType: 1 }, null]) {
+    assert.equal(worldTypeKey(world), null, JSON.stringify(world));
+  }
+  assert.deepEqual(spawnRadiusLabel({ spawnRadius: 5 }), { key: "world.spawnRadius.value", n: 5 });
+  assert.deepEqual(spawnRadiusLabel({ spawnRadius: 0 }), { key: "world.spawnRadius.value", n: 0 });
+  for (const world of [{}, { spawnRadius: -1 }, { spawnRadius: 2.5 }, { spawnRadius: "5" }, { spawnRadius: null }, null]) {
+    assert.equal(spawnRadiusLabel(world), null, JSON.stringify(world));
+  }
 });
 
 test("issue links: template per kind and target_id prefill", () => {

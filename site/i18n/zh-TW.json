@@ -125,9 +125,19 @@
     "world.spawn": "世界出生點",
     "world.spawn.copied": "已複製世界出生點：{value}",
     "world.spawn.copy": "複製世界出生點座標",
+    "world.spawnRadius": "重生半徑",
+    "world.spawnRadius.value.one": "{n} 格",
+    "world.spawnRadius.value.other": "{n} 格",
     "world.switch": "切換世界",
+    "world.type": "世界類型",
     "world.version": "版本",
     "world.version.fixed": "{edition} {version}",
-    "world.version.latest": "{edition} · 跟隨最新正式版"
+    "world.version.latest": "{edition} · 跟隨最新正式版",
+    "worldType.amplified": "巨大化",
+    "worldType.custom": "自訂",
+    "worldType.default": "預設",
+    "worldType.large_biomes": "大型生態域",
+    "worldType.single_biome": "單一生態域",
+    "worldType.superflat": "超平坦"
   }
 }

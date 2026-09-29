@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:player-club:v1:worlds",
   "title": "worlds.json",
-  "description": "Worlds, including seed (int64 as string) and the required overworld spawn.",
+  "description": "Worlds, including seed (int64 as string), the required overworld spawn and the optional world type and respawn radius.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "worlds"],
@@ -20,6 +20,11 @@
           "name": { "type": "string", "$ref": "urn:player-club:v1:defs#/$defs/plainText", "minLength": 1, "maxLength": 50 },
           "edition": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
           "gameVersion": { "type": "string", "pattern": "^(latest|[0-9]+\\.[0-9]+(\\.[0-9]+)?)$" },
+          "worldType": {
+            "description": "Optional. Java Edition world type chosen when the world was created (display name from the dictionary key worldType.<id>): default = Default (minecraft:normal), superflat = Superflat (minecraft:flat), large_biomes = Large Biomes, amplified = Amplified, single_biome = Single Biome (minecraft:single_biome_surface), custom = any other preset (data pack or legacy Customized). Omit when unknown.",
+            "type": "string",
+            "enum": ["default", "superflat", "large_biomes", "amplified", "single_biome", "custom"]
+          },
           "seed": {
             "description": "Signed 64-bit integer as a string; the int64 range is checked with BigInt by cross validation.",
             "type": "string",
@@ -34,6 +39,12 @@
               "y": { "type": "integer" },
               "z": { "type": "integer" }
             }
+          },
+          "spawnRadius": {
+            "description": "Optional. Value of the Java Edition game rule spawnRadius, in blocks. The game accepts any integer but uses max(0, value) capped by the distance to the world border, and the border reaches at most 29999984 blocks from the centre (maximum border size 59999968), so larger values can never take effect. Omit when unknown.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 29999984
           },
           "dimensions": {
             "type": "array",

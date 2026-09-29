@@ -421,6 +421,8 @@ export function runCrossRules(dataset, options = {}) {
       const required = [
         ...[...dims].map((d) => `dimension.${d}`),
         ...editions.editions.map((e) => `edition.${e.id}`),
+        // Optional world type: only the types used by a world need a display name.
+        ...new Set(worlds.worlds.filter((w) => typeof w.worldType === "string").map((w) => `worldType.${w.worldType}`)),
       ];
       for (const key of required) {
         if (!Object.hasOwn(en, key)) error("X19", i18nPath("en"), "/messages", `Missing dictionary key ${key}`);

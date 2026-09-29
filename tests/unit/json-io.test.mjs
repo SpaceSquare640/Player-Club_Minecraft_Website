@@ -99,3 +99,9 @@ test("large seed strings survive a round trip unchanged", () => {
   assert.equal(back.worlds[0].seed, "-9223372036854775808");
   assert.equal(typeof back.worlds[0].seed, "string");
 });
+
+test("optional world fields: world type follows gameVersion, respawn radius follows spawn", () => {
+  const world = { dimensions: ["overworld"], spawnRadius: 5, spawn: { z: 0, y: 64, x: 0 }, seed: "1", worldType: "superflat", gameVersion: "latest", edition: "java", name: "W", id: "w1" };
+  const back = parseJsonText(stringifyJson({ schemaVersion: 1, worlds: [world] }, "worlds")).data;
+  assert.deepEqual(Object.keys(back.worlds[0]), ["id", "name", "edition", "gameVersion", "worldType", "seed", "spawn", "spawnRadius", "dimensions"]);
+});

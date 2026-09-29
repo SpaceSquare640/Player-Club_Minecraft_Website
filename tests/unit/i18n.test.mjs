@@ -197,6 +197,34 @@ test("committed dictionaries: en is complete and both languages have the same ke
   assert.deepEqual(Object.keys(LANG_NAMES), ["en", "zh-TW"]);
 });
 
+test("committed dictionaries: every world type of the schema has a name; respawn radius has plural forms", async () => {
+  const en = (await readDict("en")).messages;
+  const zh = (await readDict("zh-TW")).messages;
+  const schema = JSON.parse(await readFile(path.join(REPO_ROOT, "schemas/v1/worlds.schema.json"), "utf8"));
+  const types = schema.properties.worlds.items.properties.worldType.enum;
+  assert.ok(types.includes("superflat"));
+  for (const type of types) {
+    assert.ok(Object.hasOwn(en, `worldType.${type}`), `en worldType.${type}`);
+    assert.ok(Object.hasOwn(zh, `worldType.${type}`), `zh-TW worldType.${type}`);
+  }
+  assert.equal(zh["worldType.superflat"], "超平坦");
+  for (const key of ["world.type", "world.spawnRadius", "world.spawnRadius.value.one", "world.spawnRadius.value.other"]) {
+    assert.ok(Object.hasOwn(en, key) && Object.hasOwn(zh, key), key);
+  }
+  const i18n = createI18n({
+    storage: createFakeStorage(),
+    documentElement: { lang: "" },
+    warn: () => {},
+    loadDictionary: async (lang) => (lang === "en" ? en : zh),
+  });
+  await i18n.init();
+  assert.equal(i18n.plural("world.spawnRadius.value", 5), "5 blocks");
+  assert.equal(i18n.plural("world.spawnRadius.value", 1), "1 block");
+  await i18n.setLang("zh-TW");
+  assert.equal(i18n.plural("world.spawnRadius.value", 5), "5 格");
+  assert.equal(i18n.t("worldType.superflat"), "超平坦");
+});
+
 test("X19 is active on the committed data: dictionaries present, no errors or warnings", async () => {
   const { dataset, issues } = await loadDataset(createFsReader(REPO_ROOT));
   assert.deepEqual(issues, []);

@@ -200,3 +200,23 @@ export function versionLabel(world) {
   if (world.gameVersion === "latest") return { key: "world.version.latest", editionKey: edition, params: {} };
   return { key: "world.version.fixed", editionKey: edition, params: { version: world.gameVersion } };
 }
+
+/**
+ * Dictionary key of the optional world type, or null when the world has none.
+ * Ids follow the Java Edition world types of schemas/v1/worlds.schema.json: default, superflat,
+ * large_biomes, amplified, single_biome and custom; names come from worldType.<id>.
+ */
+export function worldTypeKey(world) {
+  const type = world?.worldType;
+  return typeof type === "string" && /^[a-z][a-z0-9_]*$/.test(type) ? `worldType.${type}` : null;
+}
+
+/**
+ * Plural dictionary key and block count of the optional respawn radius (Java Edition game rule
+ * spawnRadius), or null when the world has none or the value is not a non-negative integer.
+ * @returns {{ key: string, n: number } | null}
+ */
+export function spawnRadiusLabel(world) {
+  const n = world?.spawnRadius;
+  return Number.isInteger(n) && n >= 0 ? { key: "world.spawnRadius.value", n } : null;
+}

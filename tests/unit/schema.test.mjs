@@ -62,6 +62,22 @@ test("spawn is required, integer x/y/z only, y not null", () => {
   assert.equal(isValid("worlds", withWorld((w) => { delete w.spawn.z; })), false);
 });
 
+test("world type and respawn radius are optional; type is a Java world type, radius 0-29999984 blocks", () => {
+  assert.equal(isValid("worlds", withWorld(() => {})), true, "both omitted");
+  for (const type of ["default", "superflat", "large_biomes", "amplified", "single_biome", "custom"]) {
+    assert.equal(isValid("worlds", withWorld((w) => { w.worldType = type; })), true, type);
+  }
+  for (const type of ["flat", "Superflat", "", null, 1]) {
+    assert.equal(isValid("worlds", withWorld((w) => { w.worldType = type; })), false, String(type));
+  }
+  for (const radius of [0, 5, 10, 29999984]) {
+    assert.equal(isValid("worlds", withWorld((w) => { w.spawnRadius = radius; })), true, String(radius));
+  }
+  for (const radius of [-1, 29999985, 2.5, "5", null]) {
+    assert.equal(isValid("worlds", withWorld((w) => { w.spawnRadius = radius; })), false, String(radius));
+  }
+});
+
 test("world dimensions are 1-3 unique known dimensions", () => {
   assert.equal(isValid("worlds", withWorld((w) => { w.dimensions = []; })), false);
   assert.equal(isValid("worlds", withWorld((w) => { w.dimensions = ["overworld", "overworld"]; })), false);
