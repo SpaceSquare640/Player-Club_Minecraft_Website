@@ -2,7 +2,8 @@
 // The Issue is read only from the event file at GITHUB_EVENT_PATH and handled as data in JavaScript;
 // nothing from it is interpolated into workflow expressions, shell commands or logs.
 // Steps: parse and check R01-R09 -> remove "approved" -> upsert the report comment (snapshot hash on its
-// last line) -> remove "approved" again -> pass: pending-review / fail: needs-fix.
+// last line) -> remove "approved" again (when only this removal finds it, the report is written again to
+// say so) -> pass: pending-review / fail: needs-fix.
 // Any failure after the event is accepted (data loading, parsing, hashing, an API call) fails closed
 // (needs-fix, no pending-review or approved) and fails the job with a log-safe error (class and HTTP status only).
 // Local: node scripts/validate-issue.mjs --event <event.json> --dry-run   (prints the report, no API calls)
@@ -70,9 +71,10 @@ export async function loadRequiredData(reader, log = () => {}) {
  * Validates the Issue of an event and updates labels and the report comment.
  * "approved" is removed before and again after the report is written, whatever labels the event payload
  * lists (a 404 means the Issue does not have it), so an approval added while validation runs is withdrawn
- * too. When anything fails (the data cannot be loaded, parsing or hashing throws, an API call fails such as
- * the report that cannot be created or updated) the Issue fails closed: needs-fix is added, pending-review
- * and approved are removed, and the error is rethrown.
+ * too; when only the second removal finds one, the report is written again so that it says so. When
+ * anything fails (the data cannot be loaded, parsing or hashing throws, an API call fails such as the report
+ * that cannot be created or updated) the Issue fails closed: needs-fix is added, pending-review and approved
+ * are removed, and the error is rethrown.
  * @param {{ event: object, dataset?: object, loadData?: () => Promise<object>, github: object, repo: object,
  *   log?: Function, approvalReason?: "changed" | "stale" }} p  dataset, or loadData to load it inside the guard.
  * @returns {Promise<{ status: "pass" | "fail", hash: string, approvalRemoved: boolean, comment: object, result: object }>}
@@ -89,9 +91,13 @@ export async function validateIssue({ event, dataset, loadData, github, repo, lo
 
     // Opening, editing or reopening always withdraws an earlier approval, before anything else.
     let approvalRemoved = await removeLabel(github, repo, number, LABELS.approved);
-    const body = renderReport({ result, hash, dataset: data, approvalRemoved, approvalReason });
-    const comment = await upsertReportComment(github, repo, number, body);
-    if (await removeLabel(github, repo, number, LABELS.approved)) approvalRemoved = true;
+    const reportBody = (removed) => renderReport({ result, hash, dataset: data, approvalRemoved: removed, approvalReason });
+    let comment = await upsertReportComment(github, repo, number, reportBody(approvalRemoved));
+    // An approval added while the report was written is withdrawn as well, and the report then says so too.
+    if ((await removeLabel(github, repo, number, LABELS.approved)) && !approvalRemoved) {
+      approvalRemoved = true;
+      comment = await upsertReportComment(github, repo, number, reportBody(true));
+    }
 
     const [add, remove] = result.ok ? [LABELS.pendingReview, LABELS.needsFix] : [LABELS.needsFix, LABELS.pendingReview];
     await addLabels(github, repo, number, [add]);

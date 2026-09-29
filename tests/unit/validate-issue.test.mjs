@@ -173,6 +173,29 @@ test("approved is removed whatever the event payload lists, before and after the
   assert.ok(racing.state.labels.has("pending-review"));
   const removals = racing.calls.filter(([name]) => name === "removeLabel").slice(0, 2);
   assert.deepEqual(removals, [["removeLabel", "approved"], ["removeLabel", "approved"]]);
+  // The report written before the second removal is written again so that it says the approval was removed.
+  assert.deepEqual(racing.calls, [
+    ["removeLabel", "approved"],
+    ["createComment", 100],
+    ["removeLabel", "approved"],
+    ["updateComment", 100],
+    ["addLabels", "pending-review"],
+    ["removeLabel", "needs-fix"],
+  ]);
+  assert.equal(racing.state.comments.length, 1, "still one report comment");
+  assert.ok(reportOf(racing).includes("> [!IMPORTANT]"));
+  assert.deepEqual(parseSnapshotMarker(reportOf(racing)), { version: 1, status: "pass", hash: second.outcome.hash });
+});
+
+test("the report is written once when the first removal already withdrew the approval", async () => {
+  const labels = ["coord-request", "type:add", "pending-review", "approved"];
+  const issue = createIssue("add", ADD_VALUES, { labels });
+  // Approved is added again while the report is written; the report already says it was removed.
+  const fake = fakeGithub({ labels, hooks: { createComment: (_, state) => state.labels.add("approved") } });
+  const { outcome } = await runEvent(createEvent("edited", issue), { github: fake });
+  assert.equal(outcome.approvalRemoved, true);
+  assert.ok(!fake.state.labels.has("approved"));
+  assert.deepEqual(fake.calls.filter(([name]) => name === "createComment" || name === "updateComment"), [["createComment", 100]]);
 });
 
 test("removeLabel treats 404 as a missing label and rethrows other errors", async () => {
