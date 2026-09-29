@@ -675,7 +675,9 @@ test("result comments are bilingual, English first, and contain no internal info
 test("dry run: evaluates and applies an event fixture in memory and writes nothing", async () => {
   const lines = [];
   const eventPath = fileURLToPath(new URL("../fixtures/events/add-point.json", import.meta.url));
-  const code = await dryRun({ eventPath, now: new Date(NOW), log: (l) => lines.push(l) });
+  // The dry run reads the committed data, whose timestamps keep moving forward, so it runs on the
+  // real clock (a fixed clock would flag newer points as "in the future", X10).
+  const code = await dryRun({ eventPath, now: new Date(), log: (l) => lines.push(l) });
   assert.equal(code, 0, lines.join("\n"));
   assert.match(lines[0], /^Issue #7 \(add\): validation pass, sha256 [0-9a-f]{64}$/);
   assert.ok(lines.includes("Would write: site/data/points/player_club.json, site/data/changelog/points.json, site/data/manifest.json"));
