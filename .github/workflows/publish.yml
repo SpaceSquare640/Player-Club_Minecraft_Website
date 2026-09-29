@@ -2,7 +2,9 @@
 # check: validation (X18 compares with the commit before the push) and unit tests; nothing is deployed
 # when it fails, so the site keeps the previous version.
 # forms-check / forms: read-only check of the generated Issue Forms; only when they are out of date does
-# the forms job join the source-code-writer queue, regenerate them and push a commit.
+# the forms job regenerate them and push a commit. It has its own issue-forms-writer queue: sharing one
+# with apply-approved would let a pending forms job replace (cancel) a pending apply job. A push that
+# races with another writer is rejected and retried (see the step comment).
 # deploy: the reusable Pages deployment (always the current Source_Code HEAD).
 # Commits pushed with GITHUB_TOKEN (the bot) do not trigger this workflow.
 name: Publish
@@ -89,7 +91,7 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: source-code-writer
+      group: issue-forms-writer
       cancel-in-progress: false
     steps:
       - name: Check out Source_Code

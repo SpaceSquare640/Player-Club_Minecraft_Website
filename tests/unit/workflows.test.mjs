@@ -104,6 +104,26 @@ test("every checkout drops the token except the one that pushes approved request
   }
 });
 
+test("concurrency: only apply is in source-code-writer, so no other writer can replace a pending apply", () => {
+  // GitHub keeps one pending job per group and cancels the older pending one when another is queued.
+  const writers = [];
+  for (const [name, yaml] of Object.entries(workflows)) {
+    for (const job of jobsOf(yaml)) {
+      if (!/^ {6}contents: write$/m.test(job.text)) continue;
+      const queue = /^ {4}concurrency:\n {6}group: (\S+)\n {6}cancel-in-progress: (\S+)\n/m.exec(job.text);
+      assert.ok(queue, `${name}: ${job.name} has a concurrency group`);
+      assert.equal(queue[2], "false", `${name}: ${job.name} never cancels a running writer`);
+      writers.push([`${name}:${job.name}`, queue[1]]);
+    }
+  }
+  assert.deepEqual(writers.sort(), [
+    ["apply-approved.yml:apply", "source-code-writer"],
+    ["publish.yml:forms", "issue-forms-writer"],
+  ]);
+  const shared = Object.entries(workflows).flatMap(([name, yaml]) => [...yaml.matchAll(/group: source-code-writer$/gm)].map(() => name));
+  assert.deepEqual(shared, ["apply-approved.yml"]);
+});
+
 test("_deploy-pages: reusable, builds Source_Code HEAD containing the expected commit, validates, stamps, deploys", () => {
   const yaml = workflows["_deploy-pages.yml"];
   assert.match(yaml, /^ {2}workflow_call:\n {4}inputs:\n {6}expected_sha:\n[\s\S]*?required: false/m);
@@ -126,10 +146,10 @@ test("publish: check with the push baseline, read-only forms check, forms writer
   assert.match(yaml, /^ {2}workflow_dispatch:$/m);
   // check: read-only, full history for X18 against the commit before the push
   assert.match(yaml, /^ {2}check:\n[\s\S]*?permissions:\n {6}contents: read\n[\s\S]*?fetch-depth: 0[\s\S]*?PCMW_BASELINE_REF: \$\{\{ github\.event\.before \}\}\n {8}run: npm run check:ci/m);
-  // forms-check is read-only; forms joins source-code-writer only when the forms are stale
+  // forms-check is read-only; forms runs (in its own issue-forms-writer queue) only when the forms are stale
   assert.match(yaml, /^ {2}forms-check:\n {4}needs: check\n[\s\S]*?permissions:\n {6}contents: read\n/m);
   assert.match(yaml, /node scripts\/gen-issue-forms\.mjs --check/);
-  assert.match(yaml, /^ {2}forms:\n {4}needs: forms-check\n {4}if: needs\.forms-check\.outputs\.stale == 'true'\n[\s\S]*?permissions:\n {6}contents: write\n {4}concurrency:\n {6}group: source-code-writer\n {6}cancel-in-progress: false/m);
+  assert.match(yaml, /^ {2}forms:\n {4}needs: forms-check\n {4}if: needs\.forms-check\.outputs\.stale == 'true'\n[\s\S]*?permissions:\n {6}contents: write\n {4}concurrency:\n {6}group: issue-forms-writer\n {6}cancel-in-progress: false/m);
   assert.match(yaml, /GH_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(yaml, /echo "::add-mask::\$auth_b64"/);
   assert.match(yaml, /user\.name="github-actions\[bot\]" -c user\.email="41898282\+github-actions\[bot\]@users\.noreply\.github\.com"/);

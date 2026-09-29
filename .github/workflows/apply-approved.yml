@@ -1,8 +1,9 @@
 # Writes approved coordinate requests to Source_Code, deploys the site and reports back on the Issues.
 # Issue content is read only by scripts/apply-requests.mjs from REST responses; it is never interpolated
 # into this workflow. Only the apply job keeps the checkout token, because it pushes the bot commits.
-# A pending run in the source-code-writer queue may be replaced by a newer one; every run scans all
-# approved Issues, and the daily schedule catches anything left over.
+# Only the apply job joins the source-code-writer queue. A pending apply may be replaced by a newer apply
+# only; every run scans all approved Issues, and the daily schedule catches anything left over. Other
+# writers (the Issue Forms job) use their own queue; a push that races with them is rejected and retried.
 name: Apply approved requests
 
 on:
