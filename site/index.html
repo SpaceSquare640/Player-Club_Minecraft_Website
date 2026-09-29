@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; font-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Player Club Minecraft Coordinates</title>
+    <meta name="description" content="Coordinates, world info and change log of the Player Club Minecraft world.">
+    <meta name="theme-color" content="#05070D">
+    <meta name="color-scheme" content="dark">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon-180.png">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Player Club Minecraft Coordinates">
+    <meta property="og:title" content="Player Club Minecraft Coordinates">
+    <meta property="og:description" content="Coordinates, world info and change log of the Player Club Minecraft world.">
+    <meta property="og:url" content="https://spacesquare640.github.io/Player-Club_Minecraft_Website/">
+    <meta property="og:image" content="https://spacesquare640.github.io/Player-Club_Minecraft_Website/assets/img/og-image-1200x630.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Player Club community badge">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <div class="pc-app" id="pc-app">
+      <button type="button" class="pc-skip" id="pc-skip" data-i18n="skip.points">Skip to points</button>
+      <div class="pc-sentinel" data-sentinel="top" aria-hidden="true"></div>
+
+      <header class="pc-header" id="pc-header">
+        <div class="pc-container pc-header__inner">
+          <a class="pc-wordmark" id="pc-wordmark" href="#" data-page-link="points">
+            <span class="pc-wordmark__name">PLAYER CLUB</span>
+            <span class="pc-wordmark__tag" data-i18n="site.tagline">Minecraft Coordinates</span>
+          </a>
+          <nav class="pc-pagenav pc-pagenav--header" aria-label="Pages" data-i18n-attr="aria-label:nav.label">
+            <a class="pc-pagenav__link" href="#" data-page-link="points" aria-current="page" data-i18n="nav.points">Coordinates</a>
+            <a class="pc-pagenav__link" href="#tab=changelog" data-page-link="changelog" data-i18n="nav.changelog">Change Log</a>
+          </nav>
+          <div class="pc-lang" role="group" aria-label="Language" data-i18n-attr="aria-label:lang.label">
+            <button type="button" class="pc-lang__btn" data-lang="en" lang="en" aria-pressed="true" aria-label="Switch to English"><span class="pc-lang__long">EN</span><span class="pc-lang__short">EN</span></button>
+            <button type="button" class="pc-lang__btn" data-lang="zh-TW" lang="zh-TW" aria-pressed="false" aria-label="切換為繁體中文"><span class="pc-lang__long">繁中</span><span class="pc-lang__short">中</span></button>
+          </div>
+          <!-- href is set from config.discordInviteUrl once the data is loaded (single source). -->
+          <a class="pc-discord" id="pc-discord" target="_blank" rel="noopener noreferrer" data-i18n-attr="aria-label:discord.aria">
+            <img class="pc-discord__icon" src="assets/img/pc-shield-32.webp" srcset="assets/img/pc-shield-32.webp 1x, assets/img/pc-shield-64.webp 2x, assets/img/pc-shield-96.webp 3x" width="32" height="32" alt="" decoding="async">
+            <span class="pc-discord__text" data-i18n="discord.cta">Join Discord</span>
+            <span class="pc-icon pc-icon--external-link" aria-hidden="true"></span>
+          </a>
+        </div>
+      </header>
+
+      <div class="pc-container">
+        <nav class="pc-pagenav pc-pagenav--bar" aria-label="Pages" data-i18n-attr="aria-label:nav.label">
+          <a class="pc-pagenav__link" href="#" data-page-link="points" aria-current="page" data-i18n="nav.points">Coordinates</a>
+          <a class="pc-pagenav__link" href="#tab=changelog" data-page-link="changelog" data-i18n="nav.changelog">Change Log</a>
+        </nav>
+      </div>
+
+      <main class="pc-main" id="pc-main" aria-busy="true">
+        <div class="pc-container">
+          <div class="pc-status" id="pc-status"></div>
+          <noscript><p class="pc-empty__body">This site needs JavaScript to show the coordinates.</p></noscript>
+
+          <section class="pc-page pc-page--points" data-page="points" aria-labelledby="pc-world-title" hidden>
+            <div class="pc-worldbar" id="pc-worldbar">
+              <h1 class="pc-worldbar__title" id="pc-world-title" tabindex="-1"></h1>
+            </div>
+            <aside class="pc-aside" id="pc-aside" aria-labelledby="pc-worldinfo-title"></aside>
+            <div class="pc-maincol">
+              <div class="pc-sentinel" data-sentinel="tabs" aria-hidden="true"></div>
+              <div class="pc-tabs-bar" id="pc-tabs-bar"></div>
+              <div class="pc-tabpanel" id="pc-tabpanel" role="tabpanel">
+                <div id="pc-toolbar-host"></div>
+                <h2 class="pc-sr-only" id="pc-points-heading" tabindex="-1" data-i18n="points.heading">Points</h2>
+                <div id="pc-pinned-host"></div>
+                <ul class="pc-cards" id="pc-cards" role="list"></ul>
+                <div class="pc-empty" id="pc-empty" hidden></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="pc-page pc-page--changelog" id="pc-changelog" data-page="changelog" aria-labelledby="pc-changelog-title" hidden></section>
+        </div>
+      </main>
+
+      <footer class="pc-footer">
+        <div class="pc-container pc-footer__inner">
+          <div class="pc-footer__brand">
+            <!-- href is set from config.discordInviteUrl once the data is loaded (single source). -->
+            <a class="pc-footer__badge-link" id="pc-footer-discord" target="_blank" rel="noopener noreferrer">
+              <img class="pc-footer__badge" src="assets/img/pc-community-64.webp" srcset="assets/img/pc-community-64.webp 1x, assets/img/pc-community-128.webp 2x" width="64" height="64" alt="Player Club Discord community badge" data-i18n-attr="alt:footer.badgeAlt" loading="lazy" decoding="async">
+            </a>
+            <span>Player Club</span>
+          </div>
+          <div class="pc-footer__notices">
+            <p data-i18n="footer.copyright">© 2026 Kingsley. All rights reserved.</p>
+            <p data-i18n="footer.source">Source code is publicly visible for reference only. Copying, modification, distribution or derivative works are not permitted without written permission.</p>
+            <p><span lang="en" data-i18n-en="footer.minecraftNotice">NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</span><span id="pc-minecraft-zh" lang="zh-TW" hidden></span></p>
+            <p data-i18n="footer.trademark">Third-party trademarks in the community icon (such as Roblox, GTA and Rockstar) belong to their respective owners.</p>
+          </div>
+        </div>
+      </footer>
+
+      <div class="pc-toast-region" id="pc-toast" role="status" aria-live="polite"></div>
+      <div class="pc-sr-only" id="pc-live" aria-live="polite" aria-atomic="true"></div>
+    </div>
+  </body>
+</html>

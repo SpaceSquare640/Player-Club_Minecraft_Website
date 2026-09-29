@@ -617,7 +617,8 @@
   text-align: right;
 }
 
-@container (max-width: 279px) {
+/* Stacked layout when the card (border box) is narrower than 280 px: 280 - 2 border - 32 padding. */
+@container (max-width: 245px) {
   .pc-coords {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -859,15 +860,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* List items stay display: list-item so the numbered markers are kept. */
 .pc-vpn__step {
-  display: grid;
-  gap: var(--pc-space-2);
   font-size: var(--pc-fs-sm);
   line-height: var(--pc-lh-sm);
 }
 
-.pc-vpn__step > .pc-btn {
-  justify-self: start;
+.pc-vpn__step > * + * {
+  margin-top: var(--pc-space-2);
 }
 
 .pc-vpn__value {
@@ -1086,6 +1086,8 @@
 
 .pc-toolbar__search {
   grid-area: search;
+  width: 100%;
+  max-width: 480px;
 }
 
 .pc-toolbar__submit {
@@ -1183,7 +1185,6 @@
 
 @media (min-width: 768px) {
   .pc-toolbar {
-    grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
     grid-template-areas:
       "search submit"
       "chips chips"
@@ -1336,7 +1337,6 @@
 .pc-pinned__name {
   grid-area: name;
   font: 600 var(--pc-fs-base) / 1.625 var(--pc-font-sans);
-  overflow-wrap: anywhere;
 }
 
 .pc-pinned__coords {
@@ -1360,7 +1360,7 @@
 
 @container (min-width: 560px) {
   .pc-pinned__body {
-    grid-template-columns: minmax(0, 1fr) auto auto var(--pc-target-min);
+    grid-template-columns: minmax(min-content, 1fr) auto auto var(--pc-target-min);
     grid-template-areas:
       "label coords copy menu"
       "name coords copy menu";
@@ -1370,8 +1370,8 @@
   }
 
   .pc-pinned__coords .pc-coords {
-    grid-template-columns: repeat(3, minmax(64px, auto));
-    column-gap: var(--pc-space-6);
+    grid-template-columns: repeat(3, minmax(48px, auto));
+    column-gap: var(--pc-space-4);
   }
 
   .pc-pinned__copy {

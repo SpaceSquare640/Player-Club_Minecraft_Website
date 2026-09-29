@@ -18,40 +18,45 @@ export const FALLBACK_TEXT = Object.freeze({
 });
 
 /** Dictionary text when available, otherwise the built-in English text. */
-export function safeText(key) {
+export function textFor(key) {
   return textLang(key) ? t(key) : (FALLBACK_TEXT[key] ?? key);
 }
 
 /**
  * Renders an error panel (role="alert") into host.
  * @param {HTMLElement} host
- * @param {{ error: unknown, onRetry: () => void, discordUrl?: string | null, titleKey?: string }} options
+ * @param {{ error: unknown, onRetry: () => void, discordUrl?: string | null, titleKey?: string,
+ *   fallbackOnly?: boolean }} options
  *   A schema version error offers "Reload" (a stale page); every other error offers "Retry".
  *   titleKey overrides the title (the change log uses "changelog.error").
+ *   fallbackOnly: core data or dictionaries failed; only the built-in English text is used and no
+ *   Discord link is shown (the invite link lives only in config.json).
  * @returns {HTMLButtonElement} the primary button.
  */
-export function renderError(host, { error, onRetry, discordUrl = null, titleKey }) {
+export function renderError(host, { error, onRetry, discordUrl = null, titleKey, fallbackOnly = false }) {
   const view = errorView(error);
+  const safeText = fallbackOnly ? (key) => FALLBACK_TEXT[key] ?? key : textFor;
   const primary = h("button", {
     className: "pc-btn pc-btn--primary",
     attrs: { type: "button" },
     text: safeText(view.actionKey),
     on: { click: () => (view.retryable ? onRetry() : globalThis.location.reload()) },
   });
-  const report = discordUrl
-    ? h(
-        "a",
-        { className: "pc-link-community", attrs: { href: discordUrl, target: "_blank", rel: "noopener noreferrer" } },
-        h("span", { text: safeText("error.report") }),
-        icon("external-link"),
-        h("span", { className: "pc-sr-only", text: ` ${safeText("link.newTab")}` }),
-      )
-    : null;
+  const report =
+    discordUrl && !fallbackOnly
+      ? h(
+          "a",
+          { className: "pc-link-community", attrs: { href: discordUrl, target: "_blank", rel: "noopener noreferrer" } },
+          h("span", { text: safeText("error.report") }),
+          icon("external-link"),
+          h("span", { className: "pc-sr-only", text: ` ${safeText("link.newTab")}` }),
+        )
+      : null;
   replaceChildren(
     host,
     h(
       "div",
-      { className: "pc-error", attrs: { role: "alert" } },
+      { className: "pc-error", attrs: { role: "alert", lang: fallbackOnly ? "en" : null } },
       icon("alert-triangle", "pc-error__icon"),
       h("p", { className: "pc-error__title", text: safeText(titleKey ?? view.titleKey) }),
       h("p", { className: "pc-error__body", text: safeText(view.bodyKey) }),
