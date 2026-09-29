@@ -15,7 +15,7 @@ body:
       label: "World / 世界"
       options:
         - "Player_Club (player_club)"
-      default: 0
+        - "Builder World (builder_world)"
     validations:
       required: true
   - type: "dropdown"

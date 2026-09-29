@@ -12,6 +12,18 @@
         "en": "Entire site",
         "zh-TW": "全站"
       }
+    },
+    {
+      "id": "u0002",
+      "date": "2026-09-29",
+      "summary": {
+        "en": "Added a second world, Builder World; World info now shows the world type and respawn radius when known",
+        "zh-TW": "新增第二個世界 Builder World；世界資訊在有資料時顯示世界類型與重生半徑"
+      },
+      "scope": {
+        "en": "World switcher, World info",
+        "zh-TW": "世界切換、世界資訊"
+      }
     }
   ]
 }

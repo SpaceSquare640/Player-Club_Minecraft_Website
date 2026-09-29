@@ -53,6 +53,25 @@ test("first batch: Village 1 is p0001 and the spawn is not a point", () => {
   assert.equal(dataset.updates.entries[0].id, "u0001");
 });
 
+test("Builder World: superflat Java world with a respawn radius, first point p0004, no VPN", () => {
+  const world = dataset.worlds.worlds.find((w) => w.id === "builder_world");
+  assert.ok(world);
+  assert.deepEqual(
+    { name: world.name, edition: world.edition, gameVersion: world.gameVersion, worldType: world.worldType, seed: world.seed, spawnRadius: world.spawnRadius },
+    { name: "Builder World", edition: "java", gameVersion: "latest", worldType: "superflat", seed: "-766612653057462542", spawnRadius: 5 },
+  );
+  assert.equal(typeof world.seed, "string");
+  assert.deepEqual(world.dimensions, ["overworld", "the_nether", "the_end"]);
+  const point = dataset.points.builder_world.points.find((p) => p.id === "p0004");
+  assert.ok(point);
+  assert.deepEqual(
+    { dimension: point.dimension, name: point.name, tags: point.tags, x: point.x, y: point.y, z: point.z, submittedBy: point.submittedBy },
+    { dimension: "overworld", name: "自動化倉存建築", tags: ["other"], x: -2, y: 56, z: -14, submittedBy: "SpaceSquare640" },
+  );
+  assert.ok(dataset.changes.entries.some((e) => e.action === "add" && e.target.id === "p0004" && e.target.worldId === "builder_world" && e.source.type === "manual"));
+  assert.ok(!dataset.vpn.vpns.some((v) => v.worldIds.includes("builder_world")), "Builder World has no VPN");
+});
+
 test("17 tags with bilingual names; three groups", () => {
   assert.deepEqual(dataset.tags.groups.map((g) => g.id), ["facility", "structure", "misc"]);
   assert.equal(dataset.tags.tags.length, 17);

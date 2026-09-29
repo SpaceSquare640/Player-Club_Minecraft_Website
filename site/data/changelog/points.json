@@ -93,6 +93,29 @@
         "type": "issue",
         "issue": 4
       }
+    },
+    {
+      "id": "c0005",
+      "date": "2026-09-29",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0004",
+        "dimension": "overworld",
+        "name": "自動化倉存建築"
+      },
+      "summary": {
+        "en": "Added point: 自動化倉存建築",
+        "zh-TW": "新增座標：自動化倉存建築"
+      },
+      "scope": {
+        "en": "Point data: Builder World / Overworld",
+        "zh-TW": "座標資料：Builder World／主世界"
+      },
+      "source": {
+        "type": "manual"
+      }
     }
   ]
 }

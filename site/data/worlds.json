@@ -13,6 +13,21 @@
         "z": 5
       },
       "dimensions": ["overworld", "the_nether", "the_end"]
+    },
+    {
+      "id": "builder_world",
+      "name": "Builder World",
+      "edition": "java",
+      "gameVersion": "latest",
+      "worldType": "superflat",
+      "seed": "-766612653057462542",
+      "spawn": {
+        "x": 0,
+        "y": 56,
+        "z": -4
+      },
+      "spawnRadius": 5,
+      "dimensions": ["overworld", "the_nether", "the_end"]
     }
   ]
 }

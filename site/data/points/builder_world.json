@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "worldId": "builder_world",
+  "points": [
+    {
+      "id": "p0004",
+      "dimension": "overworld",
+      "name": "自動化倉存建築",
+      "tags": ["other"],
+      "x": -2,
+      "y": 56,
+      "z": -14,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-09-29T15:04:32Z",
+      "updatedAt": "2026-09-29T15:04:32Z"
+    }
+  ]
+}
