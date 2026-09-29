@@ -35,7 +35,7 @@ test("index.html: CSP meta allows only self, no inline scripts, styles or handle
   );
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
   assert.equal(scripts.length, 1);
-  assert.match(scripts[0][1], /type="module" src="js\/app\.js"/);
+  assert.match(scripts[0][1], /type="module" src="js\/app\.js\?v=__ASSET_VERSION__"/);
   assert.equal(scripts[0][2].trim(), "");
   assert.doesNotMatch(html, /<style\b|\sstyle="|\son[a-z]+="/i);
   assert.doesNotMatch(html, /https?:\/\/(?!spacesquare640\.github\.io\/Player-Club_Minecraft_Website\/)/, "no external resources except the canonical page and share image URLs");
@@ -58,7 +58,8 @@ test("every local asset referenced by HTML, CSS and JS exists", () => {
   const refs = new Set();
   for (const m of html.matchAll(/(?:src|href|srcset)="([^"]+)"/g)) {
     for (const part of m[1].split(",")) {
-      const url = part.trim().split(/\s+/)[0];
+      // The asset version query (?v=__ASSET_VERSION__, stamped at deploy) is not part of the file path.
+      const url = part.trim().split(/\s+/)[0].split("?")[0];
       if (url && !url.startsWith("#") && !/^https?:/.test(url)) refs.add(url);
     }
   }
