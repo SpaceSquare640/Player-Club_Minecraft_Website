@@ -11,6 +11,18 @@ export function repoOf(context, env = process.env) {
   return { owner, repo };
 }
 
+/**
+ * Log-safe summary of an error: its class, a code such as ENOENT and the HTTP status only. The message and
+ * any request / response data are left out, because API errors carry the request body (Issue text) and
+ * workflow logs are public.
+ */
+export function describeError(error) {
+  const name = typeof error?.name === "string" && /^[A-Za-z][A-Za-z0-9]{0,39}$/.test(error.name) ? error.name : "Error";
+  const code = typeof error?.code === "string" && /^[A-Z][A-Z0-9_]{0,39}$/.test(error.code) ? ` [${error.code}]` : "";
+  const status = Number.isInteger(error?.status) ? ` (HTTP ${error.status})` : "";
+  return `${name}${code}${status}`;
+}
+
 export async function addLabels(github, repo, issueNumber, labels) {
   if (labels.length === 0) return;
   await github.rest.issues.addLabels({ ...repo, issue_number: issueNumber, labels });

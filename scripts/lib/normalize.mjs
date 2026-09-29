@@ -87,10 +87,13 @@ export function normalizeName(raw) {
  * @returns {{ empty: true } | { value: string } | { error: "control" | "length" }}
  */
 export function normalizeNote(raw) {
+  // Trailing whitespace is removed line by line (linear time; a regex over long space runs is quadratic).
   const value = String(raw ?? "")
     .normalize("NFC")
     .replace(/\r\n?/g, "\n")
-    .replace(/[^\S\n]+\n/gu, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
     .trim()
     .replace(/\n{3,}/g, "\n\n");
   if (value === "") return { empty: true };

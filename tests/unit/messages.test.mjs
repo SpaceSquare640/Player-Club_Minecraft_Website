@@ -1,7 +1,7 @@
 // Report rendering and escaping (scripts/lib/messages.mjs).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cell, code, fencedBlock, problemText, renderReport } from "../../scripts/lib/messages.mjs";
+import { MAX_LISTED, MAX_REPORT_LENGTH, cell, code, fencedBlock, problemText, renderReport } from "../../scripts/lib/messages.mjs";
 import { evaluateRequest } from "../../scripts/lib/issue-parse.mjs";
 import { REPORT_MARKER, parseSnapshotMarker, snapshotHash } from "../../scripts/lib/snapshot.mjs";
 import { createDataset, createDictionaries } from "../fixtures/dataset.mjs";
@@ -112,4 +112,61 @@ test("report: user content stays inside code spans (no Markdown, HTML, mentions 
     }
     assert.deepEqual(parseSnapshotMarker(report), { version: 1, status: "pass", hash });
   }
+});
+
+test("report: at most MAX_LISTED problems of one kind are listed, the rest is counted", () => {
+  const dataset = withDictionaries();
+  const tags = Array.from({ length: MAX_LISTED + 5 }, (_, i) => `Nope ${i} (nope_${i})`);
+  const result = evaluateRequest({ dataset, issue: createIssue("add", { ...ADD_VALUES, tags }) });
+  assert.equal(result.errors.filter((e) => e.key === "tagUnknown").length, MAX_LISTED + 5);
+  const report = renderReport({ result, hash: snapshotHash(result.request), dataset });
+  assert.equal(report.split("\n").filter((l) => l.startsWith("- **R02** Unknown tag:")).length, MAX_LISTED);
+  assert.ok(report.includes("- **R02** … and 5 more of the same kind (not listed).\n  另有 5 筆同類問題（未列出）。"));
+  assert.ok(!report.includes("nope_20"), "unlisted values are not shown");
+});
+
+test("report: point lists name at most MAX_LISTED points", () => {
+  const points = Array.from({ length: MAX_LISTED + 3 }, (_, i) => ({ id: `p${String(i + 1).padStart(4, "0")}`, name: `P${i}`, distance: i }));
+  const [en, zh] = problemText({ code: "R06", key: "nearby", params: { points, distance: 16 } });
+  assert.equal(en.match(/`p\d{4}`/g).length, MAX_LISTED);
+  assert.ok(en.endsWith(" and 3 more."), en);
+  assert.ok(zh.endsWith("，另有 3 筆。"), zh);
+  const [dupEn, dupZh] = problemText({ code: "R06", key: "duplicate", params: { points } });
+  assert.equal(dupEn.match(/`p\d{4}`/g).length, MAX_LISTED);
+  assert.ok(dupEn.includes(" and 3 more.") && dupZh.includes("另有 3 筆"));
+});
+
+test("report: a 60K Issue body gives a report within the comment limit", () => {
+  const dataset = withDictionaries();
+  const tags = Array.from({ length: 1500 }, (_, i) => `${"t".repeat(20)} ${i} (unknown_tag_${i})`);
+  const issue = createIssue("add", { ...ADD_VALUES, name: "n".repeat(5000), tags, note: "x ".repeat(5000) });
+  assert.ok(issue.body.length >= 60000, `body is ${issue.body.length}`);
+  const result = evaluateRequest({ dataset, issue });
+  const hash = snapshotHash(result.request);
+  const report = renderReport({ result, hash, dataset });
+  assert.ok(MAX_REPORT_LENGTH < 65536);
+  assert.ok(report.length <= MAX_REPORT_LENGTH, `report is ${report.length}`);
+  assert.equal(report.split("\n")[0], REPORT_MARKER);
+  assert.deepEqual(parseSnapshotMarker(report), { version: 1, status: "fail", hash });
+  assert.ok(report.includes("另有 1480 筆同類問題"));
+});
+
+test("report: over MAX_REPORT_LENGTH whole entries are dropped, a notice is added and both markers kept", () => {
+  const dataset = withDictionaries();
+  const base = evaluateRequest({ dataset, issue: createIssue("add", { ...ADD_VALUES, x: "abc" }) });
+  // Distinct codes make every problem its own kind, so only the total length bound applies.
+  const errors = Array.from({ length: 1000 }, (_, i) => ({ code: `R${i}`, key: "tagUnknown", params: { value: "v".repeat(200) } }));
+  const result = { ...base, errors };
+  const hash = snapshotHash(result.request);
+  const report = renderReport({ result, hash, dataset });
+  assert.ok(report.length <= MAX_REPORT_LENGTH, `report is ${report.length}`);
+  assert.ok(report.length > MAX_REPORT_LENGTH - 1000, "the budget is used, not wasted");
+  const lines = report.split("\n");
+  assert.equal(lines[0], REPORT_MARKER);
+  assert.deepEqual(parseSnapshotMarker(report), { version: 1, status: "fail", hash });
+  assert.ok(report.includes("has been truncated") && report.includes("已截斷"));
+  assert.ok(report.includes("**Submitter / 提交者：**"), "the footer is kept");
+  lines.forEach((line, i) => {
+    if (line.startsWith("- **R")) assert.ok(lines[i + 1].startsWith("  未知的標籤："), `entry ${i} is whole`);
+  });
 });

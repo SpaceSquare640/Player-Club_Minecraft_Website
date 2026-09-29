@@ -93,3 +93,17 @@ test("target ids and axis bounds", () => {
   assert.equal(isAxisInBounds("y", 321, bounds), false);
   assert.equal(isAxisInBounds("x", 1e20, bounds), false);
 });
+
+test("note normalization stays linear on long whitespace runs", () => {
+  const cases = [
+    ["a" + " ".repeat(40000) + "b", { error: "length" }],
+    ["a" + " \t".repeat(20000) + "\nb", { value: "a\nb" }],
+    [" ".repeat(40000), { empty: true }],
+    ["a" + " \n".repeat(20000) + "b", { value: "a\n\nb" }],
+  ];
+  const start = performance.now();
+  for (const [input, expected] of cases) assert.deepEqual(normalizeNote(input), expected);
+  const elapsed = performance.now() - start;
+  // The former regex /[^\S\n]+\n/ took seconds here (quadratic); line-by-line trimming takes milliseconds.
+  assert.ok(elapsed < 250, `took ${elapsed.toFixed(1)} ms`);
+});

@@ -1,15 +1,17 @@
 // Validates a coordinate request Issue (workflow validate-issue.yml, loaded by actions/github-script).
 // The Issue is read only from the event file at GITHUB_EVENT_PATH and handled as data in JavaScript;
 // nothing from it is interpolated into workflow expressions, shell commands or logs.
-// Steps: remove "approved" if present -> parse and check R01-R09 -> upsert the report comment
-// (snapshot hash on its last line) -> pass: pending-review / fail: needs-fix.
+// Steps: parse and check R01-R09 -> remove "approved" -> upsert the report comment (snapshot hash on its
+// last line) -> remove "approved" again -> pass: pending-review / fail: needs-fix.
+// Any failed API call fails closed (needs-fix, no pending-review or approved) and fails the job with a
+// log-safe error (class and HTTP status only).
 // Local: node scripts/validate-issue.mjs --event <event.json> --dry-run   (prints the report, no API calls)
 
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { LABELS } from "../site/js/lib/forms-meta.js";
-import { addLabels, removeLabel, repoOf, upsertReportComment } from "./lib/github.mjs";
+import { addLabels, describeError, removeLabel, repoOf, upsertReportComment } from "./lib/github.mjs";
 import { evaluateRequest, issueLabelNames } from "./lib/issue-parse.mjs";
 import { REPO_ROOT, createFsReader, loadDataset } from "./lib/load-data.mjs";
 import { renderReport } from "./lib/messages.mjs";
@@ -35,37 +37,57 @@ export function shouldValidate(event) {
 }
 
 /**
+ * Best effort after a failed step: the Issue is left without approved or pending-review and with needs-fix.
+ * Failures here are only logged (safely); the original error is what fails the job.
+ */
+async function failClosed(github, repo, number, log) {
+  const steps = [
+    ["removeLabel approved", () => removeLabel(github, repo, number, LABELS.approved)],
+    ["addLabels needs-fix", () => addLabels(github, repo, number, [LABELS.needsFix])],
+    ["removeLabel pending-review", () => removeLabel(github, repo, number, LABELS.pendingReview)],
+  ];
+  for (const [name, step] of steps) {
+    try {
+      await step();
+    } catch (error) {
+      log(`Fail-closed step failed: ${name}: ${describeError(error)}`);
+    }
+  }
+}
+
+/**
  * Validates the Issue of an event and updates labels and the report comment.
+ * "approved" is removed before and again after the report is written, whatever labels the event payload
+ * lists (a 404 means the Issue does not have it), so an approval added while validation runs is withdrawn
+ * too. When any API call fails (for example the report cannot be created or updated) the Issue fails
+ * closed: needs-fix is added, pending-review and approved are removed, and the error is rethrown.
  * @returns {Promise<{ status: "pass" | "fail", hash: string, approvalRemoved: boolean, comment: object, result: object }>}
  */
-export async function validateIssue({ event, dataset, github, repo }) {
+export async function validateIssue({ event, dataset, github, repo, log = () => {} }) {
   const issue = event.issue;
   const number = issue.number;
   const result = evaluateRequest({ dataset, issue });
   const status = result.ok ? "pass" : "fail";
   const hash = snapshotHash(result.request);
 
-  // Opening, editing or reopening always withdraws an earlier approval, before anything else.
-  let approvalRemoved = false;
-  if (issueLabelNames(issue.labels).includes(LABELS.approved)) {
-    approvalRemoved = await removeLabel(github, repo, number, LABELS.approved);
+  try {
+    // Opening, editing or reopening always withdraws an earlier approval, before anything else.
+    let approvalRemoved = await removeLabel(github, repo, number, LABELS.approved);
+    const body = renderReport({ result, hash, dataset, approvalRemoved });
+    const comment = await upsertReportComment(github, repo, number, body);
+    if (await removeLabel(github, repo, number, LABELS.approved)) approvalRemoved = true;
+
+    const [add, remove] = result.ok ? [LABELS.pendingReview, LABELS.needsFix] : [LABELS.needsFix, LABELS.pendingReview];
+    await addLabels(github, repo, number, [add]);
+    await removeLabel(github, repo, number, remove);
+    return { status, hash, approvalRemoved, comment, result };
+  } catch (error) {
+    await failClosed(github, repo, number, log);
+    throw error;
   }
-
-  const body = renderReport({ result, hash, dataset, approvalRemoved });
-  const comment = await upsertReportComment(github, repo, number, body);
-
-  const [add, remove] = result.ok ? [LABELS.pendingReview, LABELS.needsFix] : [LABELS.needsFix, LABELS.pendingReview];
-  await addLabels(github, repo, number, [add]);
-  await removeLabel(github, repo, number, remove);
-  return { status, hash, approvalRemoved, comment, result };
 }
 
-/**
- * github-script entry point: await run({ github, context, core }).
- * @param {{ github: object, context?: object, core?: object, env?: object, root?: string, reader?: object, readFileImpl?: Function }} deps
- */
-export async function run({ github, context, core, env = process.env, root = REPO_ROOT, reader, readFileImpl } = {}) {
-  const log = (message) => (core ? core.info(message) : console.log(message));
+async function validateFromEvent({ github, context, env, root, reader, readFileImpl, log }) {
   const event = await readEventFile(env.GITHUB_EVENT_PATH, readFileImpl);
   const check = shouldValidate(event);
   if (!check.ok) {
@@ -74,12 +96,28 @@ export async function run({ github, context, core, env = process.env, root = REP
   }
   const { dataset, issues } = await loadDataset(reader ?? createFsReader(root));
   if (REQUIRED_DATA.some((key) => dataset[key] === undefined)) {
-    throw new Error(`Data could not be loaded: ${issues.map((i) => `${i.file} ${i.message}`).join("; ")}`);
+    log(`Data could not be loaded: ${issues.length} problem(s) in ${[...new Set(issues.map((i) => i.file))].join(", ")}`);
+    throw Object.assign(new Error("Data could not be loaded"), { code: "DATA_UNAVAILABLE" });
   }
-  const outcome = await validateIssue({ event, dataset, github, repo: repoOf(context, env) });
+  const outcome = await validateIssue({ event, dataset, github, repo: repoOf(context, env), log });
   // Only non-user values are logged (workflow logs are public and parse "::" commands).
   log(`Issue #${Number(event.issue.number)}: ${outcome.status}, ${outcome.result.errors.length} problem(s), sha256 ${outcome.hash}, report ${outcome.comment.action}`);
   return outcome;
+}
+
+/**
+ * github-script entry point: await run({ github, context, core }).
+ * github-script prints a thrown error in full (console.error), and Octokit errors carry the request, whose
+ * body is Issue text. Every error is therefore replaced by one that states only the class and HTTP status.
+ * @param {{ github: object, context?: object, core?: object, env?: object, root?: string, reader?: object, readFileImpl?: Function }} deps
+ */
+export async function run({ github, context, core, env = process.env, root = REPO_ROOT, reader, readFileImpl } = {}) {
+  const log = (message) => (core ? core.info(message) : console.log(message));
+  try {
+    return await validateFromEvent({ github, context, env, root, reader, readFileImpl, log });
+  } catch (error) {
+    throw new Error(`Issue validation failed: ${describeError(error)}`);
+  }
 }
 
 /** Stand-in client for --dry-run: prints what would be sent, never calls the API. */

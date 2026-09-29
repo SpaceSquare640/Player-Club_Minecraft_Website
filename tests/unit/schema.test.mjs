@@ -1,7 +1,9 @@
 // JSON Schema (schemas/v1) behaviour for the data set fixtures.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createValidator } from "../../scripts/lib/ajv.mjs";
+import { isPlainText } from "../../site/js/lib/text.js";
 import { createDataset, createDictionaries } from "../fixtures/dataset.mjs";
 
 const validator = createValidator();
@@ -76,6 +78,35 @@ test("plainText rejects control, zero-width and bidi characters and outer whites
   for (const bad of [" Village", "Village ", "Vil\nlage", "Vil​lage", "Vil‮lage", "Vil⁦lage", "Vil\u0007lage", "", "x".repeat(61)]) {
     assert.equal(isValid("points", withName(bad)), false, JSON.stringify(bad));
   }
+});
+
+test("plainText / multilineText reject the same characters as site/js/lib/text.js", async () => {
+  const defs = JSON.parse(await readFile(new URL("../../schemas/v1/defs.schema.json", import.meta.url), "utf8"));
+  const plain = new RegExp(defs.$defs.plainText.pattern, "u");
+  const multi = new RegExp(defs.$defs.multilineText.pattern, "u");
+  const mismatches = [];
+  const sweep = (from, to) => {
+    for (let cp = from; cp <= to; cp += 1) {
+      const text = `a${String.fromCodePoint(cp)}b`;
+      if (plain.test(text) !== isPlainText(text)) mismatches.push(`plain U+${cp.toString(16)}`);
+      if (multi.test(text) !== isPlainText(text, { allowNewline: true })) mismatches.push(`multi U+${cp.toString(16)}`);
+    }
+  };
+  // Planes 0-3 (including lone surrogates) and plane 14, where every format and default-ignorable character lives.
+  sweep(0, 0x3ffff);
+  sweep(0xe0000, 0xeffff);
+  assert.deepEqual(mismatches, []);
+
+  // The validator itself (Ajv, unicode patterns) rejects them too.
+  const withName = (name) => {
+    const ds = createDataset();
+    ds.points.player_club.points[0].name = name;
+    return ds.points.player_club;
+  };
+  for (const cp of [0x00ad, 0x061c, 0x180e, 0x2060, 0x3164, 0xfeff, 0xe0001, 0xe007f]) {
+    assert.equal(isValid("points", withName(`Vil${String.fromCodePoint(cp)}lage`)), false, `U+${cp.toString(16)}`);
+  }
+  assert.equal(isValid("points", withName("Vil❤️lage")), true, "emoji variation selector");
 });
 
 test("point note allows line feeds but no empty string; y may be null but must exist", () => {

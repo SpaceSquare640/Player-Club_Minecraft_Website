@@ -29,14 +29,14 @@
       "enum": ["overworld", "the_nether", "the_end"]
     },
     "plainText": {
-      "description": "Single line; no C0 controls, DEL, zero-width or bidi control characters; no leading or trailing whitespace.",
+      "description": "Single line; no control (Cc) or format (Cf) characters, lone surrogates, line or paragraph separators or other invisible characters (same set as site/js/lib/text.js); no leading or trailing whitespace.",
       "type": "string",
-      "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001F\\u007F\\u200B-\\u200F\\u202A-\\u202E\\u2066-\\u2069]*$"
+      "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u001F\\u007F-\\u009F\\p{Cf}\\p{Cs}\\u034F\\u115F\\u1160\\u17B4\\u17B5\\u180B-\\u180F\\u2028\\u2029\\u2065\\u2800\\u3164\\uFFA0\\uFFF0-\\uFFF8\\u{1D159}\\u{E0000}-\\u{E0FFF}]*$"
     },
     "multilineText": {
       "description": "Same as plainText but allows line feed (U+000A).",
       "type": "string",
-      "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u0009\\u000B-\\u001F\\u007F\\u200B-\\u200F\\u202A-\\u202E\\u2066-\\u2069]*$"
+      "pattern": "^(?!\\s)(?![\\s\\S]*\\s$)[^\\u0000-\\u0009\\u000B-\\u001F\\u007F-\\u009F\\p{Cf}\\p{Cs}\\u034F\\u115F\\u1160\\u17B4\\u17B5\\u180B-\\u180F\\u2028\\u2029\\u2065\\u2800\\u3164\\uFFA0\\uFFF0-\\uFFF8\\u{1D159}\\u{E0000}-\\u{E0FFF}]*$"
     },
     "localizedText30": {
       "type": "object",

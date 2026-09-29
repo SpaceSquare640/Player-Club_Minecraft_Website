@@ -1,12 +1,16 @@
 // Bilingual bot comment text (English first, Traditional Chinese second) and the validation report.
 // Every user-supplied value is rendered inside a code span or a fenced block, so Markdown, HTML,
 // mentions and links in Issue content stay inert text. The snapshot marker is always the last line.
+// The report size is bounded whatever the Issue contains: at most MAX_LISTED problems of one kind and
+// points per list, and at most MAX_REPORT_LENGTH characters in total (GitHub rejects comments over 65536).
 
 import { FORMS } from "./form-fields.mjs";
 import { REPORT_MARKER, formatSnapshotMarker } from "./snapshot.mjs";
 import { dimensionName } from "./changelog-templates.mjs";
 import { LABELS } from "../../site/js/lib/forms-meta.js";
 
+export const MAX_LISTED = 20;
+export const MAX_REPORT_LENGTH = 60000;
 const MAX_VALUE_LENGTH = 120;
 const DASH = "—";
 
@@ -40,8 +44,16 @@ export function fencedBlock(text) {
   return `${fence}text\n${text}\n${fence}`;
 }
 
-const pointList = (points, withDistance = false) =>
-  points.map((p) => `${code(p.id)} ${code(p.name)}${withDistance ? ` (~${p.distance})` : ""}`).join(", ");
+/** Up to MAX_LISTED points; the rest is counted ("en" or "zh"). */
+function pointList(points, lang, withDistance = false) {
+  const listed = points
+    .slice(0, MAX_LISTED)
+    .map((p) => `${code(p.id)} ${code(p.name)}${withDistance ? ` (~${p.distance})` : ""}`)
+    .join(", ");
+  const more = points.length - MAX_LISTED;
+  if (more <= 0) return listed;
+  return lang === "en" ? `${listed} and ${more} more` : `${listed}，另有 ${more} 筆`;
+}
 
 /** Message templates: key -> params -> [English, Traditional Chinese]. */
 const TEXT = {
@@ -107,10 +119,13 @@ const TEXT = {
   confirmMissing: () => ["Please tick the confirmation box.", "請勾選確認方塊。"],
   tagRetired: (p) => [`Tag ${code(p.tag)} is retired and cannot be chosen for new use.`, `標籤 ${code(p.tag)} 已停用，不可新選用。`],
   duplicate: (p) => [
-    `Another point in this world and dimension has the same X and Z: ${pointList(p.points)}. The owner will check it; a duplicate is rejected when applied.`,
-    `此世界與維度已有相同 X、Z 的座標：${pointList(p.points)}。擁有者會確認；寫入時重複將被拒絕。`,
+    `Another point in this world and dimension has the same X and Z: ${pointList(p.points, "en")}. The owner will check it; a duplicate is rejected when applied.`,
+    `此世界與維度已有相同 X、Z 的座標：${pointList(p.points, "zh")}。擁有者會確認；寫入時重複將被拒絕。`,
   ],
-  nearby: (p) => [`Points within ${p.distance} blocks: ${pointList(p.points, true)}.`, `水平 ${p.distance} 格內的座標：${pointList(p.points, true)}。`],
+  nearby: (p) => [
+    `Points within ${p.distance} blocks: ${pointList(p.points, "en", true)}.`,
+    `水平 ${p.distance} 格內的座標：${pointList(p.points, "zh", true)}。`,
+  ],
   sameAsSpawn: () => [
     "Same X and Z as the world spawn. The spawn is already pinned at the top of the Overworld list.",
     "與世界出生點相同，出生點已置頂顯示。",
@@ -124,11 +139,57 @@ export function problemText(problem) {
   return template(problem.params ?? {});
 }
 
+/**
+ * List items for problems, in their original order. At most MAX_LISTED problems of one kind (same code and
+ * key) are listed; the rest is counted in one item placed where the first unlisted problem would be.
+ */
 function problemLines(problems) {
-  return problems.map((p) => {
-    const [en, zh] = problemText(p);
-    return `- **${p.code}** ${en}\n  ${zh}`;
-  });
+  const counts = new Map();
+  const overflow = new Map();
+  const lines = [];
+  for (const p of problems) {
+    const kind = `${p.code} ${p.key}`;
+    const n = (counts.get(kind) ?? 0) + 1;
+    counts.set(kind, n);
+    if (n <= MAX_LISTED) {
+      const [en, zh] = problemText(p);
+      lines.push(`- **${p.code}** ${en}\n  ${zh}`);
+    } else if (n === MAX_LISTED + 1) {
+      overflow.set(kind, { index: lines.length, code: p.code });
+      lines.push("");
+    }
+  }
+  for (const [kind, { index, code: problemCode }] of overflow) {
+    const more = counts.get(kind) - MAX_LISTED;
+    lines[index] = `- **${problemCode}** … and ${more} more of the same kind (not listed).\n  另有 ${more} 筆同類問題（未列出）。`;
+  }
+  return lines;
+}
+
+const TRUNCATED_NOTICE = [
+  "> [!WARNING]",
+  "> This report was too long for a comment and has been truncated. Fix the problems above and edit the issue to validate it again.",
+  "> 報告超過留言長度上限，已截斷；請先修正上方問題，再編輯 Issue 重新驗證。",
+  "",
+];
+
+/**
+ * Joins the report. Over MAX_REPORT_LENGTH, whole entries are dropped from the end of the body (an entry
+ * such as a fenced block is never cut in half) and a notice is added; the footer with the snapshot marker is
+ * always kept, so the first and last lines are unchanged.
+ */
+function fitReport(body, footer) {
+  const full = [...body, ...footer].join("\n");
+  if (full.length <= MAX_REPORT_LENGTH) return full;
+  const tail = [...TRUNCATED_NOTICE, ...footer];
+  let budget = MAX_REPORT_LENGTH - tail.join("\n").length - 1;
+  const kept = [];
+  for (const entry of body) {
+    if (entry.length + 1 > budget) break;
+    kept.push(entry);
+    budget -= entry.length + 1;
+  }
+  return [...kept, "", ...tail].join("\n");
 }
 
 const KIND_NAMES = Object.fromEntries(Object.entries(FORMS).map(([kind, form]) => [kind, form.name]));
@@ -259,18 +320,18 @@ export function renderReport({ result, hash, dataset, approvalRemoved = false })
   if (result.warnings.length > 0) lines.push("#### Warnings / 警告", "", ...problemLines(result.warnings), "");
   if (result.hints.length > 0) lines.push("#### Hints / 提示", "", ...problemLines(result.hints), "");
 
-  lines.push("---", "");
+  const footer = ["---", ""];
   if (result.ok) {
-    lines.push(
+    footer.push(
       `**Owner / 擁有者：** review the data above and add the ${code(LABELS.approved)} label to apply it. Editing the issue removes the approval and runs validation again.`,
       `確認上方資料後加上 ${code(LABELS.approved)} 標籤即會寫入；編輯 Issue 會移除核准並重新驗證。`,
     );
   } else {
-    lines.push(
+    footer.push(
       "**Submitter / 提交者：** edit this issue to fix the problems above; validation runs again automatically.",
       "請編輯此 Issue 修正上述問題，儲存後會自動重新驗證。",
     );
   }
-  lines.push("", `Snapshot / 快照：${code(`sha256:${hash}`)}`, formatSnapshotMarker({ status, hash }));
-  return lines.join("\n");
+  footer.push("", `Snapshot / 快照：${code(`sha256:${hash}`)}`, formatSnapshotMarker({ status, hash }));
+  return fitReport(lines, footer);
 }

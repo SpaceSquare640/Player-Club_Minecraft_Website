@@ -1,6 +1,7 @@
 // site/js/lib pure functions added for the front end: coords, filter, text.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { buildSpawnCard, convertCoord, formatCopyText, spawnTargetId, toNether, toOverworld } from "../../site/js/lib/coords.js";
 import { indexTags, matchPoint, normalizeSearch, sortChangelogEntries, sortPoints } from "../../site/js/lib/filter.js";
 import { codePointLength, hasControlChars, isPlainText, stripControlChars } from "../../site/js/lib/text.js";
@@ -118,4 +119,31 @@ test("text helpers follow the plainText rule", () => {
   assert.equal(isPlainText("a\nb", { allowNewline: true }), true);
   assert.equal(isPlainText(1), false);
   assert.equal(codePointLength("村莊😀"), 3);
+});
+
+test("text helpers reject every format, control and invisible character", () => {
+  const rejected = [
+    0x007f, 0x0080, 0x0085, 0x009f, 0x00ad, 0x034f, 0x061c, 0x115f, 0x1160, 0x17b4, 0x17b5, 0x180b, 0x180e, 0x180f,
+    0x200b, 0x200d, 0x200e, 0x202e, 0x2028, 0x2029, 0x2060, 0x2064, 0x2065, 0x2066, 0x2800, 0x3164, 0xfeff, 0xffa0,
+    0xfff0, 0xfff9, 0xfffb, 0x1d159, 0x1d173, 0xe0000, 0xe0001, 0xe0020, 0xe007f, 0xe0100, 0xe01ef, 0xe0fff,
+  ];
+  for (const cp of rejected) {
+    const text = `a${String.fromCodePoint(cp)}b`;
+    const label = `U+${cp.toString(16).toUpperCase()}`;
+    assert.equal(hasControlChars(text), true, label);
+    assert.equal(hasControlChars(text, { allowNewline: true }), true, label);
+    assert.equal(isPlainText(text), false, label);
+    assert.equal(stripControlChars(text), "ab", label);
+  }
+  assert.equal(hasControlChars("a\uD800b"), true, "lone surrogate");
+  assert.equal(stripControlChars("a\uDC00b"), "ab", "lone surrogate");
+  for (const ok of ["村莊 Village", "😀", "❤️", "Café", "a　b", "Ｘ１２", "a b"]) {
+    assert.equal(hasControlChars(ok), false, ok);
+  }
+});
+
+test("text.js writes every rejected character as an escape (the source is printable ASCII)", async () => {
+  const source = (await readFile(new URL("../../site/js/lib/text.js", import.meta.url), "utf8")).replace(/\r\n/g, "\n");
+  const offending = [...source].filter((ch) => ch !== "\n" && (ch < " " || ch > "~"));
+  assert.deepEqual(offending.map((ch) => ch.codePointAt(0).toString(16)), []);
 });
