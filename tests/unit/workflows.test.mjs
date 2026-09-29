@@ -46,6 +46,9 @@ function jobsOf(yaml) {
   return [...body.matchAll(/^ {2}([A-Za-z0-9_-]+):\n((?: {4}.*\n|\n)*)/gm)].map(([text, name]) => ({ name, text }));
 }
 
+/** The steps of a job (text after "- "), comment lines left out. */
+const stepsOf = (jobText) => jobText.replace(/^ *#.*\n/gm, "").split(/^ {6}- /m).slice(1);
+
 test("the four workflows exist", () => {
   for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
 });
@@ -122,6 +125,40 @@ test("concurrency: only apply is in source-code-writer, so no other writer can r
   ]);
   const shared = Object.entries(workflows).flatMap(([name, yaml]) => [...yaml.matchAll(/group: source-code-writer$/gm)].map(() => name));
   assert.deepEqual(shared, ["apply-approved.yml"]);
+});
+
+test("a token passed through env reaches only steps that run git and shell, never node, npm or npx", () => {
+  const tokenSteps = [];
+  for (const [name, yaml] of Object.entries(workflows)) {
+    for (const job of jobsOf(yaml)) {
+      for (const step of stepsOf(job.text)) {
+        if (!/github\.token|secrets\.|GH_TOKEN|GITHUB_TOKEN/.test(step)) continue;
+        const where = `${name}: ${job.name}: ${step.split("\n")[0]}`;
+        tokenSteps.push(where);
+        assert.doesNotMatch(step, /\b(node|npm|npx)\b/, `${where} runs node, npm or npx`);
+        assert.doesNotMatch(step, /^\s*uses:/m, `${where} hands the token to an action`);
+        const gitLines = step.split("\n").filter((line) => /(^|\s)git\s/.test(line));
+        assert.ok(gitLines.length > 0, where);
+        for (const line of gitLines) assert.match(line, /\bgit -c core\.hooksPath=\/dev\/null /, `${where}: git hooks are off: ${line.trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(tokenSteps, ["publish.yml: forms: name: Push the Issue Forms"]);
+});
+
+test("publish forms: the generator runs in a step without the token; the push step rebases, never regenerates", () => {
+  const job = jobsOf(workflows["publish.yml"]).find((j) => j.name === "forms");
+  const steps = stepsOf(job.text);
+  const generate = steps.findIndex((s) => /\bnode scripts\/gen-issue-forms\.mjs\n/.test(s));
+  const push = steps.findIndex((s) => /push origin HEAD:refs\/heads\/Source_Code/.test(s));
+  assert.ok(generate >= 0 && push === generate + 1 && push === steps.length - 1, JSON.stringify({ generate, push }));
+  assert.doesNotMatch(steps[generate], /env:|token|auth/i, "no token, no auth header while node runs");
+  assert.match(steps[generate], /\n {8}id: forms\n/);
+  assert.match(steps[generate], /git add -- \.github\/ISSUE_TEMPLATE\n[\s\S]*commit -m "chore\(forms\): regenerate issue forms"\n {10}echo "changed=true" >> "\$GITHUB_OUTPUT"/);
+  assert.match(steps[generate], /echo "changed=false" >> "\$GITHUB_OUTPUT"\n {12}exit 0/);
+  assert.match(steps[push], /\n {8}if: steps\.forms\.outputs\.changed == 'true'\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {8}run: \|\n/);
+  assert.match(steps[push], /for attempt in 1 2 3 4; do[\s\S]*fetch origin \+refs\/heads\/Source_Code:refs\/remotes\/origin\/Source_Code[\s\S]*rebase refs\/remotes\/origin\/Source_Code; then\n[\s\S]*rebase --abort[\s\S]*exit 1\n/);
+  assert.doesNotMatch(steps[push], /reset --hard|gen-issue-forms/);
 });
 
 test("_deploy-pages: reusable, builds Source_Code HEAD containing the expected commit, validates, stamps, deploys", () => {

@@ -110,9 +110,27 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # The token is given to this step only (never stored in .git/config). A rejected push (Source_Code
-      # moved on) fetches, resets to the remote head and regenerates the forms, at most 3 more times.
-      - name: Regenerate, commit and push the Issue Forms
+      # No token in this step: the generator and the packages it loads never see it.
+      - name: Regenerate and commit the Issue Forms
+        id: forms
+        run: |
+          node scripts/gen-issue-forms.mjs
+          if [ -z "$(git status --porcelain -- .github/ISSUE_TEMPLATE)" ]; then
+            echo "The Issue Forms are up to date"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add -- .github/ISSUE_TEMPLATE
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "chore(forms): regenerate issue forms"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The token is given to this step only (never stored in .git/config); it runs git only, with hooks
+      # turned off. A rejected push (Source_Code moved on) fetches and rebases the forms commit onto the
+      # remote head, at most 3 more times. Only an owner push changes what the generator reads (world names
+      # and ids, tags, dictionaries, config), and such a push runs this workflow again.
+      - name: Push the Issue Forms
+        if: steps.forms.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -120,20 +138,17 @@ jobs:
           echo "::add-mask::$auth_b64"
           auth_header="http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic $auth_b64"
           for attempt in 1 2 3 4; do
-            node scripts/gen-issue-forms.mjs
-            if [ -z "$(git status --porcelain -- .github/ISSUE_TEMPLATE)" ]; then
-              echo "The Issue Forms are up to date"
+            if git -c core.hooksPath=/dev/null -c "$auth_header" push origin HEAD:refs/heads/Source_Code; then
               exit 0
             fi
-            git add -- .github/ISSUE_TEMPLATE
-            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -m "chore(forms): regenerate issue forms"
-            if git -c "$auth_header" push origin HEAD:refs/heads/Source_Code; then
-              exit 0
+            echo "Push rejected (attempt $attempt); rebasing onto the remote Source_Code"
+            git -c core.hooksPath=/dev/null -c "$auth_header" fetch origin +refs/heads/Source_Code:refs/remotes/origin/Source_Code
+            if ! git -c core.hooksPath=/dev/null -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              rebase refs/remotes/origin/Source_Code; then
+              git -c core.hooksPath=/dev/null rebase --abort || true
+              echo "::error::The Issue Forms commit could not be rebased onto the remote Source_Code"
+              exit 1
             fi
-            echo "Push rejected (attempt $attempt); resetting to the remote Source_Code"
-            git -c "$auth_header" fetch origin +refs/heads/Source_Code:refs/remotes/origin/Source_Code
-            git reset --hard refs/remotes/origin/Source_Code
           done
           echo "::error::Could not push the regenerated Issue Forms"
           exit 1
