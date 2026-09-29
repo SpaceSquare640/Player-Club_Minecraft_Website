@@ -45,6 +45,67 @@ added.
   - UI Verse components (https://uiverse.io/), MIT License
   - Tabler Icons (https://tabler.io/icons), MIT License
 
+5.1 UI Verse components
+
+The following components from Uiverse.io were adapted in site/css/components.css
+(tabs, chips and badges, copy button). Each adapted block keeps a source note.
+
+  - rare-quail-40 by chase2k25: https://uiverse.io/chase2k25/rare-quail-40
+  - kind-pig-24 by elijahgummer: https://uiverse.io/elijahgummer/kind-pig-24
+  - wonderful-squid-57 by vinodjangid07: https://uiverse.io/vinodjangid07/wonderful-squid-57
+
+MIT License
+
+Copyright (c) the authors of the components listed above (chase2k25,
+elijahgummer and vinodjangid07), published on Uiverse.io
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+5.2 Tabler Icons
+
+The icon files in site/assets/icons/ are unmodified copies from Tabler Icons
+(https://github.com/tabler/tabler-icons, commit
+74929e50416e2b7c0abb8368cdc74bdcb2560ab6). The same license text is also kept
+in site/assets/icons/LICENSE.
+
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 --------------------------------------------------------------------------------
 繁體中文（對照譯文，如有歧義以英文版本為準）
 --------------------------------------------------------------------------------
@@ -78,3 +139,6 @@ OR MICROSOFT.
 
   - UI Verse 元件（https://uiverse.io/），MIT 授權
   - Tabler Icons（https://tabler.io/icons），MIT 授權
+
+各元件的出處與完整授權文字見上方英文版第 5 條（5.1 UI Verse 元件、5.2 Tabler
+Icons）。
