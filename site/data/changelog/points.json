@@ -47,6 +47,30 @@
         "type": "issue",
         "issue": 1
       }
+    },
+    {
+      "id": "c0003",
+      "date": "2026-09-29",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0003",
+        "dimension": "overworld",
+        "name": "Cava"
+      },
+      "summary": {
+        "en": "Added point: Cava",
+        "zh-TW": "新增座標：Cava"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 2
+      }
     }
   ]
 }

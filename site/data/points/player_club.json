@@ -25,6 +25,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-09-29T10:28:41Z",
       "updatedAt": "2026-09-29T10:28:41Z"
+    },
+    {
+      "id": "p0003",
+      "dimension": "overworld",
+      "name": "Cava",
+      "tags": ["other"],
+      "x": -70,
+      "y": 77,
+      "z": 115,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-09-29T10:45:03Z",
+      "updatedAt": "2026-09-29T10:45:03Z"
     }
   ]
 }
