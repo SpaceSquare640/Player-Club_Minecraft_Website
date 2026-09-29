@@ -284,6 +284,24 @@ test("X16 public text guard on change log and dictionaries", () => {
   assert.deepEqual(errors(run(clean), "X16"), []);
 });
 
+test("X16 does not reject user data embedded in change log templates", () => {
+  const ds = withDictionaries();
+  const entry = ds.changes.entries[0];
+  entry.target.name = "Agent's Base";
+  entry.summary = { en: "Added point: Agent's Base", "zh-TW": "新增座標：Agent's Base" };
+  ds.worlds.worlds[0].name = "Obsidian World";
+  entry.scope = { en: "Point data: Obsidian World / Overworld", "zh-TW": "座標資料：Obsidian World／主世界" };
+  ds.changes.entries[1].scope = { en: "Point data: Obsidian World / The Nether", "zh-TW": "座標資料：Obsidian World／地獄" };
+  assert.deepEqual(errors(run(ds), "X16"), []);
+
+  // Wording outside the user values is still guarded, in change entries and in update entries.
+  entry.summary.en = "Added point by an agent: Agent's Base";
+  ds.updates.entries[0].summary.en = "Agent's Base";
+  const found = errors(run(ds), "X16");
+  assert.deepEqual(found.map((e) => e.path), ["/entries/0/summary/en", "/entries/0/summary/en"]);
+  assert.deepEqual(found.map((e) => e.file), ["site/data/changelog/updates.json", "site/data/changelog/points.json"]);
+});
+
 test("X17 same world, dimension, X and Z is a warning", () => {
   const ds = createDataset();
   Object.assign(point(ds, 1), { dimension: "overworld", tags: ["base"], x: -426, z: 300, y: 10 });

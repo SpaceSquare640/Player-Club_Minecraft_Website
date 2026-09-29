@@ -6,7 +6,7 @@ import { parseId, isStandardId } from "../../site/js/lib/ids.js";
 import { compareVersion, resolveBounds } from "../../site/js/lib/version.js";
 import { isWithinBounds } from "../../site/js/lib/coords.js";
 import { CORE_FILES, I18N_DIR, LANGS, SUPPORTED_SCHEMA_VERSION, i18nPath, listDataFiles, pointsPath } from "./load-data.mjs";
-import { findInternalText } from "./public-text-guard.mjs";
+import { findInternalTextExcept } from "./public-text-guard.mjs";
 import { addDays, dateInTimeZone } from "./dates.mjs";
 import { POINT_FIELDS, SPAWN_FIELDS } from "./changelog-templates.mjs";
 
@@ -362,15 +362,18 @@ export function runCrossRules(dataset, options = {}) {
     }
   });
 
-  // X16 public text guard (change log and dictionaries)
-  const guard = (file, pointer, text) => {
-    const hits = findInternalText(text);
+  // X16 public text guard: only our own wording is checked. Update entries and dictionaries are written by us
+  // in full; coordinate change entries are fixed templates that embed user data (point and world names),
+  // which is masked so a name such as "Agent's Base" is not rejected.
+  const guard = (file, pointer, text, userValues = []) => {
+    const hits = findInternalTextExcept(text, userValues);
     if (hits.length > 0) error("X16", file, pointer, `Public text contains internal information (${hits.join(", ")})`);
   };
   for (const [key, file] of [["updates", P.updates], ["changes", P.changes]]) {
     dataset[key].entries.forEach((entry, i) => {
+      const userValues = key === "changes" ? [entry.target?.name, worldById.get(entry.target?.worldId)?.name] : [];
       for (const field of ["summary", "scope"]) {
-        for (const lang of ["en", "zh-TW"]) guard(file, `/entries/${i}/${field}/${lang}`, entry[field][lang]);
+        for (const lang of ["en", "zh-TW"]) guard(file, `/entries/${i}/${field}/${lang}`, entry[field][lang], userValues);
       }
     });
   }

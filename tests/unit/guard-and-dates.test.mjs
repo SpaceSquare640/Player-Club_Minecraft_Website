@@ -1,7 +1,7 @@
 // Public text guard (X16) and date helpers.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findInternalText } from "../../scripts/lib/public-text-guard.mjs";
+import { findInternalText, findInternalTextExcept, maskUserValues } from "../../scripts/lib/public-text-guard.mjs";
 import { addDays, dateInTimeZone, formatUtcTimestamp, isValidTimeZone } from "../../scripts/lib/dates.mjs";
 
 test("guard flags internal words and paths", () => {
@@ -19,6 +19,16 @@ test("guard does not flag ordinary text", () => {
   for (const text of ["Added a reagent farm", "Management page", "Nether conversion", "新增座標：Village 1", "Point data: Player_Club / Overworld", "X: 1/2"]) {
     assert.deepEqual(findInternalText(text), [], text);
   }
+});
+
+test("guard ignores user-supplied values embedded in our wording", () => {
+  assert.deepEqual(findInternalTextExcept("Added point: Agent's Base", ["Agent's Base"]), []);
+  assert.deepEqual(findInternalTextExcept("新增座標：Claude 的家", ["Claude 的家"]), []);
+  // Our own wording is still checked.
+  assert.deepEqual(findInternalTextExcept("Added by an agent: Home", ["Home"]), ["agent"]);
+  assert.deepEqual(findInternalTextExcept("Agent's Base", []), ["agent"]);
+  // Longer values are masked first; empty and non-string values are ignored.
+  assert.equal(maskUserValues("Point: Obsidian Farm", ["Obsidian", "Obsidian Farm", "", null]), "Point:  ");
 });
 
 test("formatUtcTimestamp drops milliseconds", () => {
