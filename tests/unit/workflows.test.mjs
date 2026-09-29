@@ -41,7 +41,7 @@ function runScripts(yaml) {
 const expressions = (yaml) => [...new Set([...yaml.matchAll(/\$\{\{[^}]*\}\}/g)].map((m) => m[0]))].sort();
 
 test("the four workflows exist", () => {
-  for (const name of ["_deploy-pages.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
+  for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
 });
 
 test("every workflow: no default permissions, pinned official actions or the local reusable workflow", () => {
@@ -116,4 +116,33 @@ test("publish: check with the push baseline, read-only forms check, forms writer
   // deploy: reusable workflow in the pages-deploy queue
   assert.match(yaml, /^ {2}deploy:\n {4}needs: check\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ github\.sha \}\}/m);
   assert.deepEqual(expressions(yaml), ["${{ github.event.before }}", "${{ github.sha }}", "${{ github.token }}", "${{ steps.forms.outputs.stale }}"]);
+});
+
+test("apply-approved: approved label, daily schedule or manual run; one writer at a time; deploy and report", () => {
+  const yaml = workflows["apply-approved.yml"];
+  assert.match(yaml, /^ {2}issues:\n {4}types: \[labeled\]\n {2}schedule:\n {4}- cron: "17 3 \* \* \*"\n {2}workflow_dispatch:$/m);
+  // apply: the only job that may push; it keeps the checkout token
+  assert.match(yaml, /^ {2}apply:\n {4}if: github\.event_name != 'issues' \|\| github\.event\.label\.name == 'approved'\n/m);
+  assert.match(yaml, /^ {2}apply:\n[\s\S]*?permissions:\n {6}contents: write\n {6}issues: write\n {4}concurrency:\n {6}group: source-code-writer\n {6}cancel-in-progress: false\n/m);
+  assert.match(yaml, /ref: Source_Code\n {10}fetch-depth: 0\n {10}persist-credentials: true/);
+  assert.match(yaml, /id: apply\n {8}uses: actions\/github-script@/);
+  assert.match(yaml, /await import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/apply-requests\.mjs`\);\n {12}await run\(\{ github, context, core \}\);/);
+  for (const output of ["needs_deploy", "results", "head_sha"]) {
+    assert.ok(yaml.includes(`\n      ${output}: $\{{ steps.apply.outputs.${output} }}\n`), output);
+  }
+  // deploy: only when something was written or waits for closing; serialized with every other deployment
+  assert.match(yaml, /^ {2}deploy:\n {4}needs: apply\n {4}if: needs\.apply\.outputs\.needs_deploy == 'true'\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ needs\.apply\.outputs\.head_sha \}\}/m);
+  // report: runs after a deployment attempt (also when it failed or was cancelled); values through env only
+  assert.match(yaml, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: always\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped'\n[\s\S]*?permissions:\n {6}contents: read\n {6}issues: write\n/m);
+  assert.match(yaml, /env:\n {10}DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}\n {10}APPLY_RESULTS: \$\{\{ needs\.apply\.outputs\.results \}\}/);
+  assert.match(yaml, /const \{ report \} = await import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/apply-requests\.mjs`\);\n {12}await report\(\{ github, context, core \}\);/);
+  assert.match(yaml, /^ {2}apply:\n[\s\S]*?timeout-minutes: 10\n/m);
+  assert.deepEqual(expressions(yaml), [
+    "${{ needs.apply.outputs.head_sha }}",
+    "${{ needs.apply.outputs.results }}",
+    "${{ needs.deploy.result }}",
+    "${{ steps.apply.outputs.head_sha }}",
+    "${{ steps.apply.outputs.needs_deploy }}",
+    "${{ steps.apply.outputs.results }}",
+  ]);
 });
