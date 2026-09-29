@@ -64,15 +64,37 @@ export function requestTrailer(issueNumber) {
   return `${REQUEST_TRAILER}: #${issueNumber}`;
 }
 
-/** Issue numbers named by "Request-Issue: #<n>" trailers in the history of HEAD. */
-export async function requestIssueNumbers(root) {
-  const out = await git(["log", `--format=%(trailers:key=${REQUEST_TRAILER},valueonly)`, "HEAD"], { cwd: root });
+const RECORD = "\x1e";
+const FIELD = "\x1f";
+/** git log format: one record per commit with author name / e-mail, committer name / e-mail and the trailer values. */
+export const REQUEST_LOG_FORMAT = `%x1e%an%x1f%ae%x1f%cn%x1f%ce%x1f%(trailers:key=${REQUEST_TRAILER},valueonly)`;
+
+/**
+ * Issue numbers from `git log --format=REQUEST_LOG_FORMAT` output. Only commits whose author and committer
+ * are both exactly BOT_IDENTITY count (the way commitFiles writes them); a trailer in any other commit is
+ * ignored, including pull request commits that GitHub squashes or rebases on merge (GitHub becomes the
+ * committer). Git identities are not authenticated: a commit with both identities set to the bot by hand
+ * and merged unchanged (merge commit) still counts.
+ */
+export function parseRequestLog(out) {
   const numbers = new Set();
-  for (const line of out.split("\n")) {
-    const m = /^#([1-9][0-9]{0,9})$/.exec(line.trim());
-    if (m) numbers.add(Number(m[1]));
+  for (const record of String(out ?? "").split(RECORD)) {
+    const fields = record.split(FIELD);
+    if (fields.length !== 5) continue;
+    const [authorName, authorEmail, committerName, committerEmail, trailers] = fields;
+    const bot = (name, email) => name === BOT_IDENTITY.name && email === BOT_IDENTITY.email;
+    if (!bot(authorName, authorEmail) || !bot(committerName, committerEmail)) continue;
+    for (const line of trailers.split("\n")) {
+      const m = /^#([1-9][0-9]{0,9})$/.exec(line.trim());
+      if (m) numbers.add(Number(m[1]));
+    }
   }
   return numbers;
+}
+
+/** Issue numbers named by "Request-Issue: #<n>" trailers of bot commits in the history of HEAD. */
+export async function requestIssueNumbers(root, run = git) {
+  return parseRequestLog(await run(["log", `--format=${REQUEST_LOG_FORMAT}`, "HEAD"], { cwd: root }));
 }
 
 /** Current HEAD commit SHA. */

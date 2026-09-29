@@ -20,6 +20,7 @@ import {
   siteLink,
   subjectText,
 } from "../../scripts/apply-requests.mjs";
+import { BOT_IDENTITY, REQUEST_LOG_FORMAT, parseRequestLog, requestIssueNumbers } from "../../scripts/lib/git.mjs";
 import { evaluateRequest } from "../../scripts/lib/issue-parse.mjs";
 import { stringifyJson } from "../../scripts/lib/json-io.mjs";
 import { I18N_DIR, POINTS_DIR, listDataFiles, loadDataset } from "../../scripts/lib/load-data.mjs";
@@ -498,6 +499,34 @@ test("run is idempotent: a Request-Issue trailer or a change entry of the Issue 
   assert.equal(again.commits, 0);
   assert.equal(first.repo.state.pushed.length, 1);
   assert.equal(again.results[0].status, "already-applied");
+});
+
+test("Request-Issue trailers count only in commits authored and committed by the bot", async () => {
+  const { name, email } = BOT_IDENTITY;
+  const record = (an, ae, cn, ce, trailers = "") => `\x1e${an}\x1f${ae}\x1f${cn}\x1f${ce}\x1f${trailers}\n`;
+  const log = [
+    record(name, email, name, email, "#4\n"), // written by commitFiles
+    record("friend-01", "friend@example.com", "friend-01", "friend@example.com", "#9\n"), // pushed or merged from a pull request
+    record("friend-01", "friend@example.com", "GitHub", "noreply@github.com", "#7\n"), // squash or rebase merge on GitHub
+    record(name, email, "GitHub", "noreply@github.com", "#6\n"), // bot author, other committer
+    record("friend-01", "friend@example.com", name, email, "#5\n"), // other author, bot committer
+    record(name.toUpperCase(), email, name, email, "#8\n"), // not exactly the bot
+    record(name, email, name, email, "#3\n#11\nnot-a-number\n#0\n"), // several values; malformed ones ignored
+    `\x1e${name}\x1f${email}\x1f${name}\x1f${email}\n`, // too few fields
+    `\x1e${name}\x1f${email}\x1f${name}\x1f${email}\x1f#12\x1fextra\n`, // too many fields
+  ].join("\n");
+  assert.deepEqual([...parseRequestLog(log)].sort((a, b) => a - b), [3, 4, 11]);
+  assert.deepEqual([...parseRequestLog("")], []);
+
+  // requestIssueNumbers asks git for exactly this format over the history of HEAD.
+  const calls = [];
+  const numbers = await requestIssueNumbers(ROOT, async (args, options) => {
+    calls.push([args, options]);
+    return log;
+  });
+  assert.deepEqual([...numbers].sort((a, b) => a - b), [3, 4, 11]);
+  assert.deepEqual(calls, [[["log", `--format=${REQUEST_LOG_FORMAT}`, "HEAD"], { cwd: ROOT }]]);
+  assert.equal(REQUEST_LOG_FORMAT, "%x1e%an%x1f%ae%x1f%cn%x1f%ce%x1f%(trailers:key=Request-Issue,valueonly)");
 });
 
 test("run: a push rejected because Source_Code moved on is retried on the new remote head", async () => {
