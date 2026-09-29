@@ -1,0 +1,44 @@
+# Validates coordinate request Issues and reports the result as a comment.
+# Issue content is read only by scripts/validate-issue.mjs from the event file (GITHUB_EVENT_PATH);
+# it is never interpolated into this workflow.
+name: Validate issue
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions: {}
+
+jobs:
+  validate:
+    if: github.event.issue.state == 'open' && contains(github.event.issue.labels.*.name, 'coord-request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    concurrency:
+      group: validate-issue-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Check out Source_Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: Source_Code
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate the issue
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/validate-issue.mjs`);
+            await run({ github, context, core });
