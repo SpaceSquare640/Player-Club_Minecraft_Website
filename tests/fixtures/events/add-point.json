@@ -1,0 +1,31 @@
+{
+  "action": "opened",
+  "issue": {
+    "number": 7,
+    "state": "open",
+    "title": "[Add / 新增] Test Village",
+    "body": "### World / 世界\n\nPlayer_Club (player_club)\n\n### Dimension / 維度\n\nOverworld / 主世界 (overworld)\n\n### Name / 名稱\n\nTest Village\n\n### Tags / 標籤\n\nVillage / 村莊 (village)\n\n### F3 coordinates / F3 座標整串\n\n_No response_\n\n### X\n\n1000\n\n### Y (optional) / Y（選填）\n\n70\n\n### Z\n\n-1000\n\n### Note (optional) / 說明（選填）\n\n_No response_\n\n### Confirmation / 確認\n\n- [X] This point may be made public, and my GitHub account will be shown as the submitter. / 此座標可公開，且我的 GitHub 帳號將顯示為提交者。",
+    "user": {
+      "login": "friend-01",
+      "type": "User"
+    },
+    "labels": [
+      {
+        "name": "coord-request"
+      },
+      {
+        "name": "type:add"
+      }
+    ]
+  },
+  "repository": {
+    "name": "Player-Club_Minecraft_Website",
+    "owner": {
+      "login": "SpaceSquare640"
+    }
+  },
+  "sender": {
+    "login": "friend-01",
+    "type": "User"
+  }
+}

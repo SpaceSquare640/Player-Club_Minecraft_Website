@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { createDryRunGithub, readEventFile, run, shouldValidate } from "../../scripts/validate-issue.mjs";
 import { describeError, removeLabel, repoOf } from "../../scripts/lib/github.mjs";
 import { evaluateRequest } from "../../scripts/lib/issue-parse.mjs";
@@ -298,4 +299,46 @@ test("workflow: minimal permissions, pinned official actions, no user values in 
   assert.match(yaml, /^ {6}group: validate-issue-\$\{\{ github\.event\.issue\.number \}\}$/m);
   assert.doesNotMatch(yaml, /github\.event\.(issue\.(title|body|user)|comment)/);
   assert.match(yaml, /await import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/validate-issue\.mjs`\)/);
+});
+
+test("github-script runtime path: event file from GITHUB_EVENT_PATH and data from the checked-out site/data", async () => {
+  // No reader or readFileImpl: exactly what run({ github, context, core }) does in the workflow.
+  const eventPath = fileURLToPath(new URL("../fixtures/events/add-point.json", import.meta.url));
+  const event = JSON.parse(await readFile(eventPath, "utf8"));
+  const fake = fakeGithub({ labels: event.issue.labels.map((l) => l.name) });
+  const infos = [];
+  const outcome = await run({ github: fake.github, context: { repo: REPO }, core: { info: (m) => infos.push(m) }, env: { GITHUB_EVENT_PATH: eventPath } });
+  assert.equal(outcome.status, "pass", JSON.stringify(outcome.result.errors));
+  assert.equal(outcome.result.request.worldId, "player_club");
+  assert.equal(outcome.result.request.submittedBy, "friend-01");
+  assert.deepEqual(parseSnapshotMarker(reportOf(fake)), { version: 1, status: "pass", hash: outcome.hash });
+  assert.ok(fake.state.labels.has("pending-review"));
+  assert.ok(!infos.join("\n").includes("Test Village"), "user content is not logged");
+});
+
+test("data that cannot be loaded or evaluated fails closed as well", async () => {
+  const broken = createDataset();
+  broken.worlds = { schemaVersion: 1 }; // loads, but evaluation throws (no worlds array)
+  const cases = [
+    [{ read: async () => null, list: async () => null }, "Issue validation failed: Error [DATA_UNAVAILABLE]"],
+    [memoryReader(broken), "Issue validation failed: TypeError"],
+  ];
+  for (const [reader, message] of cases) {
+    const labels = ["coord-request", "type:add", "pending-review", "approved"];
+    const event = createEvent("edited", createIssue("add", ADD_VALUES, { labels }));
+    const fake = fakeGithub({ labels });
+    await assert.rejects(
+      run({ github: fake.github, context: { repo: REPO }, env: { GITHUB_EVENT_PATH: EVENT_PATH }, reader, readFileImpl: async () => JSON.stringify(event) }),
+      (error) => error.message === message,
+    );
+    assert.ok(fake.state.labels.has("needs-fix"), message);
+    assert.ok(!fake.state.labels.has("pending-review"), message);
+    assert.ok(!fake.state.labels.has("approved"), message);
+    assert.equal(fake.state.comments.length, 0, "no report is written");
+  }
+});
+
+test("events without a valid Issue number are skipped", () => {
+  const issue = createIssue("add", ADD_VALUES);
+  for (const number of [0, -1, 1.5, "12", null]) assert.equal(shouldValidate(createEvent("opened", { ...issue, number })).ok, false, String(number));
 });

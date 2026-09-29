@@ -89,7 +89,7 @@ test("output is LF-only with a single trailing newline; empty containers are com
 
 test("parseJsonText flags a BOM", () => {
   assert.deepEqual(parseJsonText('{"a":1}'), { data: { a: 1 }, bom: false });
-  assert.deepEqual(parseJsonText('﻿{"a":1}'), { data: { a: 1 }, bom: true });
+  assert.deepEqual(parseJsonText('\uFEFF{"a":1}'), { data: { a: 1 }, bom: true });
   assert.throws(() => parseJsonText("{a:1}"), SyntaxError);
 });
 

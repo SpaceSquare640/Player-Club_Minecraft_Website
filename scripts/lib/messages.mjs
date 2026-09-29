@@ -126,6 +126,11 @@ const TEXT = {
     `Points within ${p.distance} blocks: ${pointList(p.points, "en", true)}.`,
     `水平 ${p.distance} 格內的座標：${pointList(p.points, "zh", true)}。`,
   ],
+  duplicateOnApply: (p) => [
+    `Another point in this world and dimension already has the same X and Z: ${pointList(p.points, "en")}. A duplicate cannot be added.`,
+    `此世界與維度已有相同 X、Z 的座標：${pointList(p.points, "zh")}，重複座標不可新增。`,
+  ],
+  targetChanged: () => ["The target changed after the request was validated.", "請求驗證後，目標資料已變更。"],
   sameAsSpawn: () => [
     "Same X and Z as the world spawn. The spawn is already pinned at the top of the Overworld list.",
     "與世界出生點相同，出生點已置頂顯示。",
@@ -283,16 +288,25 @@ function requestRows(result, dataset) {
 
 /**
  * Renders the validation report comment.
- * @param {{ result: object, hash: string, dataset: object, approvalRemoved?: boolean }} p
+ * @param {{ result: object, hash: string, dataset: object, approvalRemoved?: boolean, approvalReason?: "changed" | "stale" }} p
+ *   approvalReason "stale": the approval was withdrawn when applying (the request, its target or the report
+ *   changed after the approval); otherwise the Issue was opened, edited or reopened.
  */
-export function renderReport({ result, hash, dataset, approvalRemoved = false }) {
+export function renderReport({ result, hash, dataset, approvalRemoved = false, approvalReason = "changed" }) {
   const status = result.ok ? "pass" : "fail";
   const lines = [REPORT_MARKER];
   lines.push(result.ok ? "### Validation passed / 驗證通過" : "### Validation failed / 驗證未通過", "");
   const kindName = result.kind ? KIND_NAMES[result.kind] : "Unknown / 未知";
   lines.push(`**Request / 請求：** ${kindName}`, "");
 
-  if (approvalRemoved) {
+  if (approvalRemoved && approvalReason === "stale") {
+    lines.push(
+      "> [!IMPORTANT]",
+      `> The ${code(LABELS.approved)} label was removed because the request or its target changed after it was reviewed, or the approval came before this report. The owner must review it again.`,
+      `> 由於請求或其目標在審核後已變更，或核准早於本報告，${code(LABELS.approved)} 標籤已移除，需擁有者重新審核。`,
+      "",
+    );
+  } else if (approvalRemoved) {
     lines.push(
       "> [!IMPORTANT]",
       `> The ${code(LABELS.approved)} label was removed because the issue was opened, edited or reopened. The owner must review it again.`,
@@ -334,4 +348,94 @@ export function renderReport({ result, hash, dataset, approvalRemoved = false })
   }
   footer.push("", `Snapshot / 快照：${code(`sha256:${hash}`)}`, formatSnapshotMarker({ status, hash }));
   return fitReport(lines, footer);
+}
+
+// ---------------------------------------------------------------------------
+// Result comments of apply-approved (one new comment per outcome). They carry no snapshot and are never
+// trusted as input; user values only appear inside code spans.
+
+export const RESULT_MARKER = "<!-- pcmw:result -->";
+
+const STALE_REASONS = {
+  noReport: ["No validation report was found for this request.", "找不到此請求的驗證報告。"],
+  reportFailed: ["The latest validation report did not pass.", "最新的驗證報告未通過。"],
+  approvedBeforeReport: ["The approval was given before the latest validation report was written.", "核准早於最新的驗證報告。"],
+  hashMismatch: ["The request or the data it changes was modified after it was validated.", "請求內容或其目標資料在驗證後已變更。"],
+  invalidNow: ["The request no longer passes validation with the current data.", "以目前資料驗證，此請求已不再通過。"],
+};
+
+/** The approved label was added by an account that is not an approver. */
+export function renderUnauthorizedComment() {
+  return [
+    RESULT_MARKER,
+    "### Approval not accepted / 核准未被接受",
+    "",
+    `The ${code(LABELS.approved)} label was added by an account that is not an approver, so it has been removed. Only the site owner can approve requests.`,
+    `${code(LABELS.approved)} 標籤由非核准者加上，已移除；只有網站擁有者可以核准請求。`,
+  ].join("\n");
+}
+
+/** The approval no longer matches the request; it was withdrawn and the request validated again. */
+export function renderStaleComment({ reason }) {
+  const [en, zh] = STALE_REASONS[reason] ?? STALE_REASONS.hashMismatch;
+  return [
+    RESULT_MARKER,
+    "### Approval withdrawn / 核准已撤回",
+    "",
+    en,
+    zh,
+    "",
+    `The approval was removed and the request was validated again (see the report comment). The owner must review it and add ${code(LABELS.approved)} again.`,
+    `已移除核准並重新驗證（見報告留言）；需擁有者重新審核後再加上 ${code(LABELS.approved)}。`,
+  ].join("\n");
+}
+
+/** Data validation issues are technical English; each is shown as one code span. */
+function dataIssueLines(issues) {
+  const lines = issues.slice(0, MAX_LISTED).map((i) => `- ${code(`${i.code} ${i.file}${i.path ? `#${i.path}` : ""}: ${i.message}`)}`);
+  if (issues.length > MAX_LISTED) lines.push(`- … and ${issues.length - MAX_LISTED} more (not listed) / 另有 ${issues.length - MAX_LISTED} 筆（未列出）`);
+  return lines;
+}
+
+/** The approved request could not be applied (duplicate, changed target or invalid data after applying). */
+export function renderRejectedComment({ problems = [], dataIssues = [] } = {}) {
+  const lines = [
+    RESULT_MARKER,
+    "### Request not applied / 請求未寫入",
+    "",
+    "The request could not be applied, so the approval was removed.",
+    "請求無法寫入，已移除核准。",
+    "",
+  ];
+  if (problems.length > 0) lines.push("#### Problems / 問題", "", ...problemLines(problems), "");
+  if (dataIssues.length > 0) lines.push("#### Data validation / 資料驗證", "", ...dataIssueLines(dataIssues), "");
+  lines.push(
+    "Edit the issue if the request needs to change; the owner can approve it again afterwards.",
+    "如需調整請編輯 Issue，之後擁有者可再次核准。",
+  );
+  return lines.join("\n");
+}
+
+/** Written and published. url is built from config.siteUrl and validated ids only. */
+export function renderAppliedComment({ url, pointId = null }) {
+  const lines = [RESULT_MARKER, "### Applied / 已寫入", "", `The request was applied and published: ${url}`, `請求已寫入並發布：${url}`];
+  if (pointId) lines.push("", `Point ID / 座標 ID：${code(pointId)}`);
+  lines.push(
+    "",
+    "> [!NOTE]",
+    "> The site can take about 10 minutes to show the change (page cache).",
+    "> 網站快取約 10 分鐘，更新可能稍後才會顯示。",
+  );
+  return lines.join("\n");
+}
+
+/** Written, but the deployment failed; the next run deploys again and closes the Issue. */
+export function renderDeployFailedComment() {
+  return [
+    RESULT_MARKER,
+    "### Publishing failed / 發布失敗",
+    "",
+    `The request was written to the data, but publishing the site failed. The ${code(LABELS.approved)} label is kept; the next scheduled run (daily) or a manual run publishes the site again and closes this issue.`,
+    `請求已寫入資料，但網站發布失敗。${code(LABELS.approved)} 標籤保留，下次排程（每日）或手動執行時會重新發布並關閉此 Issue。`,
+  ].join("\n");
 }

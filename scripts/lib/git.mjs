@@ -49,3 +49,63 @@ export function createGitReader(root, commit) {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Writing (apply-requests): bot commits with a Request-Issue trailer, push, reset to the remote.
+// Branch names and identities are constants of the caller; nothing here comes from Issue content except
+// the commit subject, which the caller reduces to one short line.
+
+export const BOT_IDENTITY = Object.freeze({ name: "github-actions[bot]", email: "41898282+github-actions[bot]@users.noreply.github.com" });
+export const REQUEST_TRAILER = "Request-Issue";
+
+/** The trailer line of a commit that applies the request of an Issue. */
+export function requestTrailer(issueNumber) {
+  if (!Number.isInteger(issueNumber) || issueNumber < 1) throw new RangeError("Invalid Issue number");
+  return `${REQUEST_TRAILER}: #${issueNumber}`;
+}
+
+/** Issue numbers named by "Request-Issue: #<n>" trailers in the history of HEAD. */
+export async function requestIssueNumbers(root) {
+  const out = await git(["log", `--format=%(trailers:key=${REQUEST_TRAILER},valueonly)`, "HEAD"], { cwd: root });
+  const numbers = new Set();
+  for (const line of out.split("\n")) {
+    const m = /^#([1-9][0-9]{0,9})$/.exec(line.trim());
+    if (m) numbers.add(Number(m[1]));
+  }
+  return numbers;
+}
+
+/** Current HEAD commit SHA. */
+export async function headCommit(root) {
+  return (await git(["rev-parse", "HEAD"], { cwd: root })).trim();
+}
+
+/** Commits exactly the given paths as the bot, with the trailer as the last paragraph; returns the SHA. */
+export async function commitFiles(root, { paths, subject, trailer, identity = BOT_IDENTITY }) {
+  if (paths.length === 0) throw new Error("Nothing to commit");
+  if (/[\r\n]/.test(subject) || /[\r\n]/.test(trailer)) throw new Error("Commit subject and trailer must be single lines");
+  await git(["add", "--", ...paths], { cwd: root });
+  await git(["-c", `user.name=${identity.name}`, "-c", `user.email=${identity.email}`, "commit", "-m", subject, "-m", trailer, "--", ...paths], { cwd: root });
+  return headCommit(root);
+}
+
+/**
+ * Pushes HEAD to the branch. Returns { pushed: false } when the remote rejects it as not a fast-forward
+ * (the branch moved on); any other failure (for example a rule rejecting the push) is thrown.
+ */
+export async function pushHead(root, branch) {
+  try {
+    await git(["push", "--porcelain", "origin", `HEAD:refs/heads/${branch}`], { cwd: root });
+    return { pushed: true };
+  } catch (error) {
+    const output = `${error?.stdout ?? ""}\n${error?.stderr ?? ""}`;
+    if (/\[rejected\]/.test(output)) return { pushed: false };
+    throw error;
+  }
+}
+
+/** Fetches the branch and resets the working tree and HEAD to it (drops local commits that were not pushed). */
+export async function resetToRemote(root, branch) {
+  await git(["fetch", "origin", `+refs/heads/${branch}:refs/remotes/origin/${branch}`], { cwd: root });
+  await git(["reset", "--hard", `refs/remotes/origin/${branch}`], { cwd: root });
+}

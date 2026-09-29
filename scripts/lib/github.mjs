@@ -57,3 +57,24 @@ export async function upsertReportComment(github, repo, issueNumber, body) {
   const { data } = await github.rest.issues.createComment({ ...repo, issue_number: issueNumber, body });
   return { action: "created", id: data?.id };
 }
+
+/** Open Issues that have every one of the labels (pull requests are left out). */
+export async function listOpenIssuesWithLabels(github, repo, labels) {
+  const items = await github.paginate(github.rest.issues.listForRepo, { ...repo, state: "open", labels: labels.join(","), per_page: 100 });
+  return items.filter((item) => !item.pull_request);
+}
+
+/** Issue events (labeled, unlabeled, ...) in API order, oldest first. */
+export async function listIssueEvents(github, repo, issueNumber) {
+  return github.paginate(github.rest.issues.listEvents, { ...repo, issue_number: issueNumber, per_page: 100 });
+}
+
+export async function createComment(github, repo, issueNumber, body) {
+  const { data } = await github.rest.issues.createComment({ ...repo, issue_number: issueNumber, body });
+  return data;
+}
+
+/** Closes an Issue as completed. */
+export async function closeIssue(github, repo, issueNumber) {
+  await github.rest.issues.update({ ...repo, issue_number: issueNumber, state: "closed", state_reason: "completed" });
+}

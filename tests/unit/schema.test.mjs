@@ -75,7 +75,7 @@ test("plainText rejects control, zero-width and bidi characters and outer whites
     return ds.points.player_club;
   };
   assert.equal(isValid("points", withName("村莊 Village 2")), true);
-  for (const bad of [" Village", "Village ", "Vil\nlage", "Vil​lage", "Vil‮lage", "Vil⁦lage", "Vil\u0007lage", "", "x".repeat(61)]) {
+  for (const bad of [" Village", "Village ", "Vil\nlage", "Vil\u200Blage", "Vil\u202Elage", "Vil\u2066lage", "Vil\u0007lage", "", "x".repeat(61)]) {
     assert.equal(isValid("points", withName(bad)), false, JSON.stringify(bad));
   }
 });

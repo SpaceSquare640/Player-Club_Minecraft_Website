@@ -108,11 +108,11 @@ test("sortChangelogEntries: date descending, then id descending within a day", (
 
 test("text helpers follow the plainText rule", () => {
   assert.equal(hasControlChars("a\u0000b"), true);
-  assert.equal(hasControlChars("a‮b"), true, "bidi override");
-  assert.equal(hasControlChars("a​b"), true, "zero-width space");
+  assert.equal(hasControlChars("a\u202Eb"), true, "bidi override");
+  assert.equal(hasControlChars("a\u200Bb"), true, "zero-width space");
   assert.equal(hasControlChars("a\nb"), true);
   assert.equal(hasControlChars("a\nb", { allowNewline: true }), false);
-  assert.equal(stripControlChars("vi​llage\u0007\n"), "village");
+  assert.equal(stripControlChars("vi\u200Bllage\u0007\n"), "village");
   assert.equal(isPlainText("Village 1"), true);
   assert.equal(isPlainText(" Village"), false);
   assert.equal(isPlainText("a\nb"), false);

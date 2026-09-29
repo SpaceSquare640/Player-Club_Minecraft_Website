@@ -3,8 +3,8 @@
 // nothing from it is interpolated into workflow expressions, shell commands or logs.
 // Steps: parse and check R01-R09 -> remove "approved" -> upsert the report comment (snapshot hash on its
 // last line) -> remove "approved" again -> pass: pending-review / fail: needs-fix.
-// Any failed API call fails closed (needs-fix, no pending-review or approved) and fails the job with a
-// log-safe error (class and HTTP status only).
+// Any failure after the event is accepted (data loading, parsing, hashing, an API call) fails closed
+// (needs-fix, no pending-review or approved) and fails the job with a log-safe error (class and HTTP status only).
 // Local: node scripts/validate-issue.mjs --event <event.json> --dry-run   (prints the report, no API calls)
 
 import { readFile } from "node:fs/promises";
@@ -31,6 +31,7 @@ export function shouldValidate(event) {
   const issue = event?.issue;
   if (!HANDLED_ACTIONS.includes(event?.action)) return { ok: false, reason: "event action is not handled" };
   if (!issue || issue.pull_request) return { ok: false, reason: "not an issue" };
+  if (!Number.isInteger(issue.number) || issue.number < 1) return { ok: false, reason: "issue number is invalid" };
   if (issue.state !== "open") return { ok: false, reason: "issue is not open" };
   if (!issueLabelNames(issue.labels).includes(LABELS.coordRequest)) return { ok: false, reason: `no ${LABELS.coordRequest} label` };
   return { ok: true, reason: "" };
@@ -55,25 +56,40 @@ async function failClosed(github, repo, number, log) {
   }
 }
 
+/** Loads the data set through a reader; throws DATA_UNAVAILABLE when a file the checks need is missing. */
+export async function loadRequiredData(reader, log = () => {}) {
+  const { dataset, issues } = await loadDataset(reader);
+  if (REQUIRED_DATA.some((key) => dataset[key] === undefined)) {
+    log(`Data could not be loaded: ${issues.length} problem(s) in ${[...new Set(issues.map((i) => i.file))].join(", ")}`);
+    throw Object.assign(new Error("Data could not be loaded"), { code: "DATA_UNAVAILABLE" });
+  }
+  return dataset;
+}
+
 /**
  * Validates the Issue of an event and updates labels and the report comment.
  * "approved" is removed before and again after the report is written, whatever labels the event payload
  * lists (a 404 means the Issue does not have it), so an approval added while validation runs is withdrawn
- * too. When any API call fails (for example the report cannot be created or updated) the Issue fails
- * closed: needs-fix is added, pending-review and approved are removed, and the error is rethrown.
+ * too. When anything fails (the data cannot be loaded, parsing or hashing throws, an API call fails such as
+ * the report that cannot be created or updated) the Issue fails closed: needs-fix is added, pending-review
+ * and approved are removed, and the error is rethrown.
+ * @param {{ event: object, dataset?: object, loadData?: () => Promise<object>, github: object, repo: object,
+ *   log?: Function, approvalReason?: "changed" | "stale" }} p  dataset, or loadData to load it inside the guard.
  * @returns {Promise<{ status: "pass" | "fail", hash: string, approvalRemoved: boolean, comment: object, result: object }>}
  */
-export async function validateIssue({ event, dataset, github, repo, log = () => {} }) {
+export async function validateIssue({ event, dataset, loadData, github, repo, log = () => {}, approvalReason = "changed" }) {
   const issue = event.issue;
   const number = issue.number;
-  const result = evaluateRequest({ dataset, issue });
-  const status = result.ok ? "pass" : "fail";
-  const hash = snapshotHash(result.request);
 
   try {
+    const data = dataset ?? (await loadData());
+    const result = evaluateRequest({ dataset: data, issue });
+    const status = result.ok ? "pass" : "fail";
+    const hash = snapshotHash(result.request);
+
     // Opening, editing or reopening always withdraws an earlier approval, before anything else.
     let approvalRemoved = await removeLabel(github, repo, number, LABELS.approved);
-    const body = renderReport({ result, hash, dataset, approvalRemoved });
+    const body = renderReport({ result, hash, dataset: data, approvalRemoved, approvalReason });
     const comment = await upsertReportComment(github, repo, number, body);
     if (await removeLabel(github, repo, number, LABELS.approved)) approvalRemoved = true;
 
@@ -94,12 +110,9 @@ async function validateFromEvent({ github, context, env, root, reader, readFileI
     log(`Skipped: ${check.reason}`);
     return { skipped: true, reason: check.reason };
   }
-  const { dataset, issues } = await loadDataset(reader ?? createFsReader(root));
-  if (REQUIRED_DATA.some((key) => dataset[key] === undefined)) {
-    log(`Data could not be loaded: ${issues.length} problem(s) in ${[...new Set(issues.map((i) => i.file))].join(", ")}`);
-    throw Object.assign(new Error("Data could not be loaded"), { code: "DATA_UNAVAILABLE" });
-  }
-  const outcome = await validateIssue({ event, dataset, github, repo: repoOf(context, env), log });
+  const repo = repoOf(context, env);
+  const loadData = () => loadRequiredData(reader ?? createFsReader(root), log);
+  const outcome = await validateIssue({ event, loadData, github, repo, log });
   // Only non-user values are logged (workflow logs are public and parse "::" commands).
   log(`Issue #${Number(event.issue.number)}: ${outcome.status}, ${outcome.result.errors.length} problem(s), sha256 ${outcome.hash}, report ${outcome.comment.action}`);
   return outcome;
