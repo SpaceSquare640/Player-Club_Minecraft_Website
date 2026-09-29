@@ -122,7 +122,7 @@ test("plainText / multilineText reject the same characters as site/js/lib/text.j
   for (const cp of [0x00ad, 0x061c, 0x180e, 0x2060, 0x3164, 0xfeff, 0xe0001, 0xe007f]) {
     assert.equal(isValid("points", withName(`Vil${String.fromCodePoint(cp)}lage`)), false, `U+${cp.toString(16)}`);
   }
-  assert.equal(isValid("points", withName("Vil❤️lage")), true, "emoji variation selector");
+  assert.equal(isValid("points", withName(`Vil❤${String.fromCodePoint(0xfe0f)}lage`)), true, "emoji variation selector");
 });
 
 test("point note allows line feeds but no empty string; y may be null but must exist", () => {

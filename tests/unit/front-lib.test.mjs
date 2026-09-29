@@ -52,7 +52,7 @@ test("buildSpawnCard: only on the Overworld tab, generated from world.spawn", ()
 });
 
 test("normalizeSearch: NFKC, lower case, collapsed whitespace", () => {
-  assert.equal(normalizeSearch("  ＶＩＬＬＡＧＥ　１  "), "village 1");
+  assert.equal(normalizeSearch(`  ＶＩＬＬＡＧＥ${String.fromCodePoint(0x3000)}１  `), "village 1"); // ideographic space
   assert.equal(normalizeSearch("Nether\tFortress"), "nether fortress");
   assert.equal(normalizeSearch(undefined), "");
 });
@@ -137,7 +137,9 @@ test("text helpers reject every format, control and invisible character", () => 
   }
   assert.equal(hasControlChars("a\uD800b"), true, "lone surrogate");
   assert.equal(stripControlChars("a\uDC00b"), "ab", "lone surrogate");
-  for (const ok of ["村莊 Village", "😀", "❤️", "Café", "a　b", "Ｘ１２", "a b"]) {
+  // Invisible and combining characters come from code points: VS16, combining acute, ideographic space, NBSP.
+  const cp = (n) => String.fromCodePoint(n);
+  for (const ok of ["村莊 Village", "😀", `❤${cp(0xfe0f)}`, `Cafe${cp(0x301)}`, `a${cp(0x3000)}b`, "Ｘ１２", `a${cp(0xa0)}b`]) {
     assert.equal(hasControlChars(ok), false, ok);
   }
 });
