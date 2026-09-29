@@ -1033,7 +1033,7 @@
   }
 }
 
-@media (max-width: 399px) {
+@media (max-width: 519px) {
   .pc-tabs {
     overflow-x: auto;
     scrollbar-width: none;
@@ -1055,7 +1055,9 @@
 
   .pc-tabs:not(.pc-tabs--sm) .pc-tab__count {
     min-width: 0;
+    margin-bottom: 4px;
     padding: 0;
+    line-height: 1;
     background: none;
   }
 }
