@@ -13,10 +13,10 @@ import {
 
 test("coordinates: full-width digits, minus signs and whitespace", () => {
   assert.deepEqual(parseCoordinate("１２３"), { value: 123 });
-  assert.deepEqual(parseCoordinate("−426"), { value: -426 });
+  assert.deepEqual(parseCoordinate("\u2212426"), { value: -426 });
   assert.deepEqual(parseCoordinate("－４２６"), { value: -426 });
-  assert.deepEqual(parseCoordinate("– 42"), { value: -42 });
-  assert.deepEqual(parseCoordinate("﹣10"), { value: -10 });
+  assert.deepEqual(parseCoordinate("\u2013 42"), { value: -42 });
+  assert.deepEqual(parseCoordinate("\uFE6310"), { value: -10 });
   assert.deepEqual(parseCoordinate(" 1 024 "), { value: 1024 });
 });
 
@@ -41,7 +41,7 @@ test("optional Y: empty, dash (full-width and minus sign) and values", () => {
   assert.deepEqual(parseOptionalY(""), { empty: true });
   assert.deepEqual(parseOptionalY("-"), { clear: true });
   assert.deepEqual(parseOptionalY("－"), { clear: true });
-  assert.deepEqual(parseOptionalY("−"), { clear: true });
+  assert.deepEqual(parseOptionalY("\u2212"), { clear: true });
   assert.deepEqual(parseOptionalY("64.9"), { value: 64 });
   assert.deepEqual(parseOptionalY("x"), { error: "format" });
 });
@@ -52,7 +52,7 @@ test("F3: Java XYZ and Block lines, Bedrock Position, plain values", () => {
   assert.deepEqual(parseF3("Block: -124 64 789"), { x: -124, y: 64, z: 789 });
   assert.deepEqual(parseF3("Position: 7, 103, 5"), { x: 7, y: 103, z: 5 });
   assert.deepEqual(parseF3("７ １０３ ５"), { x: 7, y: 103, z: 5 });
-  assert.deepEqual(parseF3("座標：−7, 103, 5"), { x: -7, y: 103, z: 5 });
+  assert.deepEqual(parseF3("座標：\u22127, 103, 5"), { x: -7, y: 103, z: 5 });
 });
 
 test("F3: wrong count, exponents and thousands separators are rejected", () => {
@@ -64,11 +64,11 @@ test("F3: wrong count, exponents and thousands separators are rejected", () => {
 
 test("names: NFC, trim, collapsed whitespace, control and bidi characters, length", () => {
   assert.deepEqual(normalizeName("  My   Base  "), { value: "My Base" });
-  assert.deepEqual(normalizeName("Café"), { value: "Café" });
+  assert.deepEqual(normalizeName("Cafe\u0301"), { value: "Café" });
   assert.deepEqual(normalizeName("Agent's Base"), { value: "Agent's Base" });
   assert.deepEqual(normalizeName("a\tb"), { error: "control" });
-  assert.deepEqual(normalizeName("evil‮txt"), { error: "control" });
-  assert.deepEqual(normalizeName("zero​width"), { error: "control" });
+  assert.deepEqual(normalizeName("evil\u202Etxt"), { error: "control" });
+  assert.deepEqual(normalizeName("zero\u200Bwidth"), { error: "control" });
   assert.deepEqual(normalizeName("line\nbreak"), { error: "control" });
   assert.deepEqual(normalizeName("x".repeat(60)), { value: "x".repeat(60) });
   assert.deepEqual(normalizeName("x".repeat(61)), { error: "length" });

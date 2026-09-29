@@ -4,7 +4,7 @@
 import { codePointLength, hasControlChars } from "../../site/js/lib/text.js";
 
 // U+2212 minus sign, U+2012-U+2015 dashes, U+FE63 small hyphen-minus, U+FF0D full-width hyphen-minus.
-const MINUS_RE = /[−‒-―﹣－]/g;
+const MINUS_RE = /[\u2212\u2012-\u2015\uFE63\uFF0D]/g;
 const THOUSANDS_RE = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
 const NUMBER_RE = /^-?\d+(\.\d+)?$/;
 const F3_LABEL_RE = /^[\p{L}\p{M} ]{1,30}:/u;

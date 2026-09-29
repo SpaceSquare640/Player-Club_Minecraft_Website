@@ -92,7 +92,7 @@ test("add: R02 unknown ids, R03 range, X07 / X08, R07 text, R08 confirmation, R0
     {
       ...ADD_VALUES,
       dimension: "The End / 終界 (the_end)",
-      name: "bad‮name",
+      name: "bad\u202Ename",
       tags: ["Nope (nope)", "Village / 村莊 (village)", "Old (old_tag)", "Bedrock (bedrock_only)"],
       x: "30,000,001",
       y: "400",
