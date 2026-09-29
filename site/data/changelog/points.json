@@ -23,6 +23,30 @@
       "source": {
         "type": "manual"
       }
+    },
+    {
+      "id": "c0002",
+      "date": "2026-09-29",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0002",
+        "dimension": "overworld",
+        "name": "Cave Base"
+      },
+      "summary": {
+        "en": "Added point: Cave Base",
+        "zh-TW": "新增座標：Cave Base"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 1
+      }
     }
   ]
 }
