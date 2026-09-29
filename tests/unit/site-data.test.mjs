@@ -16,15 +16,22 @@ test("site data loads and validates without errors", () => {
 });
 
 test("first batch: manifest sequences, world, spawn and seed", () => {
-  assert.deepEqual(dataset.manifest, { schemaVersion: 1, pointSeq: 1, changeSeq: 1, updateSeq: 1 });
-  const [world] = dataset.worlds.worlds;
-  assert.equal(world.id, "player_club");
+  // Sequences only grow as points and entries are added (approved requests or owner edits),
+  // so the first-batch values are a floor, not a fixed snapshot.
+  assert.equal(dataset.manifest.schemaVersion, 1);
+  for (const key of ["pointSeq", "changeSeq", "updateSeq"]) {
+    assert.ok(Number.isInteger(dataset.manifest[key]) && dataset.manifest[key] >= 1, key);
+  }
+  const world = dataset.worlds.worlds.find((w) => w.id === "player_club");
+  assert.ok(world);
   assert.equal(world.name, "Player_Club");
   assert.equal(world.edition, "java");
   assert.equal(world.gameVersion, "latest");
   assert.equal(world.seed, "652938494491123000");
   assert.equal(typeof world.seed, "string");
-  assert.deepEqual(world.spawn, { x: 7, y: 103, z: 5 });
+  // The spawn can be changed through the spawn request form; only its shape is fixed.
+  assert.deepEqual(Object.keys(world.spawn), ["x", "y", "z"]);
+  for (const axis of ["x", "y", "z"]) assert.ok(Number.isInteger(world.spawn[axis]), axis);
   assert.deepEqual(world.dimensions, ["overworld", "the_nether", "the_end"]);
   assert.equal(dataset.config.discordInviteUrl, "https://discord.gg/aaUQVJeCgC");
   assert.deepEqual(dataset.config.approvers, ["SpaceSquare640"]);
@@ -32,9 +39,10 @@ test("first batch: manifest sequences, world, spawn and seed", () => {
 
 test("first batch: Village 1 is p0001 and the spawn is not a point", () => {
   const points = dataset.points.player_club.points;
-  assert.equal(points.length, 1);
+  const village = points.find((p) => p.id === "p0001");
+  assert.ok(village);
   assert.deepEqual(
-    { id: points[0].id, name: points[0].name, tags: points[0].tags, x: points[0].x, y: points[0].y, z: points[0].z },
+    { id: village.id, name: village.name, tags: village.tags, x: village.x, y: village.y, z: village.z },
     { id: "p0001", name: "Village 1", tags: ["village"], x: -426, y: 72, z: 300 },
   );
   assert.ok(!points.some((p) => /spawn/i.test(p.name) || p.tags.includes("spawn")));
