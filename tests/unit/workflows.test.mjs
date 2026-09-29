@@ -40,6 +40,12 @@ function runScripts(yaml) {
 
 const expressions = (yaml) => [...new Set([...yaml.matchAll(/\$\{\{[^}]*\}\}/g)].map((m) => m[0]))].sort();
 
+/** The jobs of a workflow as { name, text } (text: the job's lines, header included). */
+function jobsOf(yaml) {
+  const body = yaml.slice(yaml.search(/^jobs:$/m));
+  return [...body.matchAll(/^ {2}([A-Za-z0-9_-]+):\n((?: {4}.*\n|\n)*)/gm)].map(([text, name]) => ({ name, text }));
+}
+
 test("the four workflows exist", () => {
   for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
 });
@@ -56,6 +62,22 @@ test("every workflow: no default permissions, pinned official actions or the loc
     }
     assert.doesNotMatch(yaml, /configure-pages/, name);
   }
+});
+
+test("every job runs on the pinned ubuntu-24.04 image (ubuntu-latest moves to a new release on its own)", () => {
+  let runners = 0;
+  for (const [name, yaml] of Object.entries(workflows)) {
+    assert.doesNotMatch(yaml, /ubuntu-latest/, name);
+    const jobs = jobsOf(yaml);
+    assert.ok(jobs.length > 0, `${name}: jobs are found`);
+    for (const job of jobs) {
+      if (/^ {4}uses: /m.test(job.text)) continue; // a reusable workflow call has no runner of its own
+      assert.match(job.text, /^ {4}runs-on: ubuntu-24\.04\n/m, `${name}: ${job.name}`);
+      runners += 1;
+    }
+    assert.equal([...yaml.matchAll(/runs-on:/g)].length, jobs.filter((j) => !/^ {4}uses: /m.test(j.text)).length, `${name}: one runs-on per job`);
+  }
+  assert.equal(runners, 8);
 });
 
 test("every workflow: shell scripts contain no expressions and no Issue or comment content is referenced", () => {

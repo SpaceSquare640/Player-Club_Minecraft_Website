@@ -17,7 +17,7 @@ permissions: {}
 jobs:
   apply:
     if: github.event_name != 'issues' || github.event.label.name == 'approved'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
@@ -71,7 +71,7 @@ jobs:
   report:
     needs: [apply, deploy]
     if: always() && needs.apply.result == 'success' && needs.deploy.result != 'skipped'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
