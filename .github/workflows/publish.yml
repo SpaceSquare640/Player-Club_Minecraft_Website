@@ -1,0 +1,150 @@
+# Checks and publishes pushes to Source_Code.
+# check: validation (X18 compares with the commit before the push) and unit tests; nothing is deployed
+# when it fails, so the site keeps the previous version.
+# forms-check / forms: read-only check of the generated Issue Forms; only when they are out of date does
+# the forms job join the source-code-writer queue, regenerate them and push a commit.
+# deploy: the reusable Pages deployment (always the current Source_Code HEAD).
+# Commits pushed with GITHUB_TOKEN (the bot) do not trigger this workflow.
+name: Publish
+
+on:
+  push:
+    branches: [Source_Code]
+    paths:
+      - "site/**"
+      - "schemas/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate data and run tests
+        env:
+          PCMW_BASELINE_REF: ${{ github.event.before }}
+        run: npm run check:ci
+
+  forms-check:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      stale: ${{ steps.forms.outputs.stale }}
+    steps:
+      - name: Check out Source_Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: Source_Code
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Compare the Issue Forms with the data
+        id: forms
+        run: |
+          if node scripts/gen-issue-forms.mjs --check; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  forms:
+    needs: forms-check
+    if: needs.forms-check.outputs.stale == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: source-code-writer
+      cancel-in-progress: false
+    steps:
+      - name: Check out Source_Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: Source_Code
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # The token is given to this step only (never stored in .git/config). A rejected push (Source_Code
+      # moved on) fetches, resets to the remote head and regenerates the forms, at most 3 more times.
+      - name: Regenerate, commit and push the Issue Forms
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          auth_b64="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth_b64"
+          auth_header="http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic $auth_b64"
+          for attempt in 1 2 3 4; do
+            node scripts/gen-issue-forms.mjs
+            if [ -z "$(git status --porcelain -- .github/ISSUE_TEMPLATE)" ]; then
+              echo "The Issue Forms are up to date"
+              exit 0
+            fi
+            git add -- .github/ISSUE_TEMPLATE
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore(forms): regenerate issue forms"
+            if git -c "$auth_header" push origin HEAD:refs/heads/Source_Code; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt); resetting to the remote Source_Code"
+            git -c "$auth_header" fetch origin +refs/heads/Source_Code:refs/remotes/origin/Source_Code
+            git reset --hard refs/remotes/origin/Source_Code
+          done
+          echo "::error::Could not push the regenerated Issue Forms"
+          exit 1
+
+  deploy:
+    needs: check
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    uses: ./.github/workflows/_deploy-pages.yml
+    with:
+      expected_sha: ${{ github.sha }}

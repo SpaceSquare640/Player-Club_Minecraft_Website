@@ -1,0 +1,89 @@
+# Reusable deployment to GitHub Pages (called by publish.yml and apply-approved.yml).
+# It always builds the current Source_Code HEAD, not the commit of the calling event, so the deployment
+# that finishes last contains every pushed commit. The calling job sets the pages-deploy concurrency group;
+# this file sets none, so the two cannot wait on each other.
+name: Deploy Pages
+
+on:
+  workflow_call:
+    inputs:
+      expected_sha:
+        description: Commit that must be included in the deployed Source_Code HEAD (optional)
+        required: false
+        type: string
+        default: ""
+    outputs:
+      page_url:
+        description: URL of the deployed site
+        value: ${{ jobs.deploy.outputs.page_url }}
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out Source_Code HEAD
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: Source_Code
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check that the expected commit is included
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [ -z "$EXPECTED_SHA" ]; then
+            echo "No expected commit given"
+            exit 0
+          fi
+          if ! printf '%s' "$EXPECTED_SHA" | grep -Eqx '[0-9a-f]{40}([0-9a-f]{24})?'; then
+            echo "::error::expected_sha is not a full commit SHA"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$EXPECTED_SHA" HEAD; then
+            echo "::error::Source_Code HEAD does not contain the expected commit"
+            exit 1
+          fi
+          echo "Source_Code HEAD contains the expected commit"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate data
+        run: node scripts/validate.mjs
+
+      - name: Stamp asset versions into _site
+        run: node scripts/stamp-version.mjs --out _site
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
