@@ -16,8 +16,9 @@
 //   Label and comment changes happen only after the push succeeded (or when nothing was committed), so a
 //   scan that is thrown away leaves no trace. Outputs: needs_deploy, results (JSON), head_sha.
 // report (job report): after the deployment, applied Issues get a comment with the site link, the applied
-//   label and are closed, but only when the deployment succeeded. A cancelled deployment (replaced by a
-//   newer one, or the run was cancelled) only gets a comment; a failed one also gets deploy-failed. Both
+//   label and are closed, but only when the deployment succeeded, or when it was cancelled (replaced by a
+//   newer one) and within about 10 minutes the live github-pages deployment is a commit that contains
+//   head_sha. Otherwise a cancelled deployment only gets a comment; a failed one also gets deploy-failed. Both
 //   keep approved and stay open, so the next scan deploys again and closes them. That comment is one per
 //   Issue (the deploy status comment), updated in place by later runs.
 // Local: node scripts/apply-requests.mjs --event <event.json> --dry-run   (prints what would be written)
@@ -36,8 +37,10 @@ import * as gitOps from "./lib/git.mjs";
 import {
   addLabels,
   closeIssue,
+  commitContains,
   createComment,
   describeError,
+  findLiveDeployment,
   listIssueComments,
   listIssueEvents,
   listOpenIssuesWithLabels,
@@ -66,6 +69,10 @@ export const BRANCH = "Source_Code";
 export const MAX_PUSH_RETRIES = 3;
 /** Result statuses that wait for the deployment and are closed by report. */
 export const REPORTED_STATUSES = Object.freeze(["applied", "already-applied"]);
+/** How long report waits, after a cancelled deployment, for a newer one that contains the commit (about 10 minutes). */
+export const SUPERSEDED_WAIT = Object.freeze({ attempts: 20, intervalMs: 30_000 });
+const PAGES_ENVIRONMENT = "github-pages";
+const COMMIT_SHA_RE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 const RESULT_STATUSES = ["applied", "already-applied", "unauthorized", "stale", "rejected"];
 const RESULT_KINDS = ["add", "edit", "delete", "spawn"];
 const SUBJECT_NAME_LENGTH = 60;
@@ -436,19 +443,58 @@ async function loadConfig(reader) {
 }
 
 /**
- * github-script entry point of job report: await report({ github, context, core }).
- * env: DEPLOY_RESULT (needs.deploy.result) and APPLY_RESULTS (needs.apply.outputs.results).
+ * After a cancelled deployment: polls (at most wait.attempts times, wait.intervalMs apart) until the live
+ * github-pages deployment is a commit that contains headSha, which happens when a newer deployment
+ * replaced the cancelled one and finished. A deployment's commit is the one of the run that started it;
+ * the site it built is never older (Source_Code HEAD at build time), so a match means the change is live.
+ * Any API error ends the wait with false (the Issues then get the cancelled notice).
  */
-export async function report({ github, context, core, env = process.env, root = REPO_ROOT, reader } = {}) {
+async function publishedByLaterDeployment({ github, repo, headSha, wait, sleep, log }) {
+  for (let attempt = 1; attempt <= wait.attempts; attempt += 1) {
+    try {
+      const live = await findLiveDeployment(github, repo, PAGES_ENVIRONMENT);
+      if (live && COMMIT_SHA_RE.test(String(live.sha)) && (await commitContains(github, repo, live.sha, headSha))) return true;
+    } catch (error) {
+      log(`Checking the live deployment failed: ${describeError(error)}`);
+      return false;
+    }
+    if (attempt < wait.attempts) await sleep(wait.intervalMs);
+  }
+  return false;
+}
+
+/**
+ * github-script entry point of job report: await report({ github, context, core }).
+ * env: DEPLOY_RESULT (needs.deploy.result), APPLY_RESULTS (needs.apply.outputs.results) and HEAD_SHA
+ * (needs.apply.outputs.head_sha, the commit the deployment had to include).
+ */
+export async function report({
+  github,
+  context,
+  core,
+  env = process.env,
+  root = REPO_ROOT,
+  reader,
+  wait = SUPERSEDED_WAIT,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+} = {}) {
   const log = (message) => (core ? core.info(message) : console.log(message));
   try {
     const repo = repoOf(context, env);
     const deployResult = String(env.DEPLOY_RESULT ?? "");
     // Only a deployment that finished counts as published; anything else leaves the Issues open.
-    const deployed = deployResult === "success";
-    const cancelled = deployResult === "cancelled";
+    let deployed = deployResult === "success";
+    let cancelled = deployResult === "cancelled";
     const results = parseResults(env.APPLY_RESULTS).filter((r) => REPORTED_STATUSES.includes(r.status));
     const config = await loadConfig(reader ?? createFsReader(root));
+    const headSha = String(env.HEAD_SHA ?? "");
+    if (cancelled && results.length > 0 && COMMIT_SHA_RE.test(headSha)) {
+      log(`Deployment cancelled; waiting for a newer live deployment that contains ${headSha}`);
+      if (await publishedByLaterDeployment({ github, repo, headSha, wait, sleep, log })) {
+        log("A newer live deployment contains the commit; reporting it as published");
+        [deployed, cancelled] = [true, false];
+      }
+    }
     let failures = 0;
     for (const r of results) {
       try {

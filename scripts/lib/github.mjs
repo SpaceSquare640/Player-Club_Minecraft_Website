@@ -91,6 +91,25 @@ export async function createComment(github, repo, issueNumber, body) {
   return data;
 }
 
+/**
+ * The live deployment of an environment: the newest of its latest deployments whose latest status is
+ * "success" (GitHub marks older successful ones inactive), or null. Needs deployments: read.
+ */
+export async function findLiveDeployment(github, repo, environment, { scan = 10 } = {}) {
+  const { data: deployments } = await github.rest.repos.listDeployments({ ...repo, environment, per_page: scan });
+  for (const deployment of deployments ?? []) {
+    const { data: statuses } = await github.rest.repos.listDeploymentStatuses({ ...repo, deployment_id: deployment.id, per_page: 1 });
+    if (statuses?.[0]?.state === "success") return deployment;
+  }
+  return null;
+}
+
+/** True when commit head contains commit base (the compare API reports "identical" or "ahead"). */
+export async function commitContains(github, repo, head, base) {
+  const { data } = await github.rest.repos.compareCommitsWithBasehead({ ...repo, basehead: `${base}...${head}`, per_page: 1 });
+  return data?.status === "identical" || data?.status === "ahead";
+}
+
 /** Closes an Issue as completed. */
 export async function closeIssue(github, repo, issueNumber) {
   await github.rest.issues.update({ ...repo, issue_number: issueNumber, state: "closed", state_reason: "completed" });

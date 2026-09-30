@@ -460,8 +460,8 @@ export function renderDeployCancelledComment() {
     RESULT_MARKER,
     "### Publishing cancelled / 發布已取消",
     "",
-    `The request was written to the data, but publishing the site was cancelled before it finished (for example, a newer publishing run replaced it). The ${code(LABELS.approved)} label is kept; the next scheduled run (daily) or a manual run publishes the site again and closes this issue.`,
-    `請求已寫入資料，但網站發布在完成前已取消（例如被較新的發布取代）。${code(LABELS.approved)} 標籤保留，下次排程（每日）或手動執行時會重新發布並關閉此 Issue。`,
+    `The request was written to the data, but publishing the site was cancelled before it finished, and no newer publishing that includes it had finished yet. The ${code(LABELS.approved)} label is kept; the next scheduled run (daily) or a manual run publishes the site again and closes this issue.`,
+    `請求已寫入資料，但網站發布在完成前已取消，且尚無包含此變更的較新發布完成。${code(LABELS.approved)} 標籤保留，下次排程（每日）或手動執行時會重新發布並關閉此 Issue。`,
     DEPLOY_STATUS_MARKER,
   ].join("\n");
 }

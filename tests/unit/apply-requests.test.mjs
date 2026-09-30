@@ -686,18 +686,53 @@ test("siteLink points at the point (not for deletions) and names the world only 
   assert.equal(siteLink(config, { kind: "spawn", pointId: null, worldId: "player_club" }), config.siteUrl);
 });
 
-async function runReport(deployResult, results, { entries, gh: existing, dataset = createDataset() } = {}) {
+/**
+ * Deployments API stand-in. polls[i] is what the i-th check sees: [{ id, sha, state }] newest first (state:
+ * latest status). compare reports "ahead" for the "base...head" pairs in contains. error: thrown by the list.
+ */
+function fakeDeployments(gh, { polls, contains = new Set(), error = null }) {
+  const calls = [];
+  let poll = -1;
+  gh.github.rest.repos = {
+    async listDeployments(p) {
+      calls.push(["listDeployments", p.environment]);
+      if (error) throw error;
+      poll = Math.min(poll + 1, polls.length - 1);
+      return { data: polls[poll].map(({ id, sha }) => ({ id, sha })) };
+    },
+    async listDeploymentStatuses(p) {
+      calls.push(["listDeploymentStatuses", p.deployment_id]);
+      const { state } = polls[poll].find((d) => d.id === p.deployment_id);
+      return { data: state ? [{ state }] : [] };
+    },
+    async compareCommitsWithBasehead(p) {
+      calls.push(["compare", p.basehead]);
+      return { data: { status: contains.has(p.basehead) ? "ahead" : "diverged" } };
+    },
+  };
+  return calls;
+}
+
+async function runReport(deployResult, results, { entries, gh: existing, dataset = createDataset(), headSha, deployments = { polls: [[]] } } = {}) {
   const gh = existing ?? fakeGithub(entries ?? results.map((r) => approvedEntry(dataset, "add", ADD_VALUES, { number: r.issue })));
+  const deployCalls = fakeDeployments(gh, deployments);
   const infos = [];
+  const sleeps = [];
   const outcome = await report({
     github: gh.github,
     context: { repo: REPO },
     core: { info: (m) => infos.push(m) },
-    env: { DEPLOY_RESULT: deployResult, APPLY_RESULTS: JSON.stringify(results) },
+    env: { DEPLOY_RESULT: deployResult, APPLY_RESULTS: JSON.stringify(results), ...(headSha === undefined ? {} : { HEAD_SHA: headSha }) },
     reader: memoryReader(dataset),
+    wait: { attempts: 3, intervalMs: 1000 },
+    sleep: async (ms) => sleeps.push(ms),
   });
-  return { outcome, gh, infos };
+  return { outcome, gh, infos, sleeps, deployCalls };
 }
+
+const HEAD_SHA = "a".repeat(40);
+const LIVE_SHA = "b".repeat(40);
+const OLD_SHA = "c".repeat(40);
 
 test("report: a successful deployment comments the link, labels applied and closes", async () => {
   const results = [
@@ -738,6 +773,67 @@ test("report: a cancelled deployment is not treated as published; the Issue stay
     assert.ok(!lines.join("\n").includes("https://"), "no site link: the change is not confirmed to be published");
   }
   assert.ok(infos.includes("Issue #12: left open (deployment cancelled)"));
+});
+
+test("report: a cancelled deployment replaced by a newer live one that contains the commit is reported as published", async () => {
+  const results = [{ issue: 12, status: "applied", kind: "add", pointId: "p0003", worldId: "player_club" }];
+  // First check: the newer deployment is still running and the live one is older. Second check: the newer
+  // one finished (GitHub marks the previous one inactive) and its commit contains HEAD_SHA.
+  const polls = [
+    [{ id: 3, sha: LIVE_SHA, state: "in_progress" }, { id: 2, sha: OLD_SHA, state: "success" }],
+    [{ id: 3, sha: LIVE_SHA, state: "success" }, { id: 2, sha: OLD_SHA, state: "inactive" }],
+  ];
+  const { outcome, gh, infos, sleeps, deployCalls } = await runReport("cancelled", results, {
+    headSha: HEAD_SHA,
+    deployments: { polls, contains: new Set([`${HEAD_SHA}...${LIVE_SHA}`]) },
+  });
+  assert.deepEqual(outcome, { deployed: true, reported: 1 });
+  assert.deepEqual(gh.mutations(), [
+    ["createComment", 12],
+    ["addLabels", 12, "applied"],
+    ["removeLabel", 12, "pending-review"],
+    ["removeLabel", 12, "deploy-failed"],
+    ["update", 12, "closed", "completed"],
+  ]);
+  assert.ok(lastComment(gh, 12).includes("#point=p0003"));
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(deployCalls, [
+    ["listDeployments", "github-pages"],
+    ["listDeploymentStatuses", 3],
+    ["listDeploymentStatuses", 2],
+    ["compare", `${HEAD_SHA}...${OLD_SHA}`],
+    ["listDeployments", "github-pages"],
+    ["listDeploymentStatuses", 3],
+    ["compare", `${HEAD_SHA}...${LIVE_SHA}`],
+  ]);
+  assert.ok(infos.includes("A newer live deployment contains the commit; reporting it as published"));
+});
+
+test("report: a cancelled deployment stays cancelled unless a live deployment is confirmed to contain the commit", async () => {
+  const results = [{ issue: 12, status: "already-applied" }];
+  const polls = [[{ id: 2, sha: OLD_SHA, state: "success" }]];
+  // Never confirmed: every attempt is used, then the cancelled notice.
+  const waited = await runReport("cancelled", results, { headSha: HEAD_SHA, deployments: { polls } });
+  assert.deepEqual(waited.outcome, { deployed: false, reported: 1 });
+  assert.deepEqual(waited.gh.mutations(), [["createComment", 12]]);
+  assert.ok(lastComment(waited.gh, 12).includes("Publishing cancelled"));
+  assert.deepEqual(waited.sleeps, [1000, 1000]);
+  assert.equal(waited.deployCalls.filter(([name]) => name === "listDeployments").length, 3);
+
+  // An API error (for example a missing permission) ends the wait at once; only class and status are logged.
+  const error = Object.assign(new Error("secret detail"), { name: "HttpError", status: 403 });
+  const denied = await runReport("cancelled", results, { headSha: HEAD_SHA, deployments: { polls, error } });
+  assert.deepEqual(denied.outcome, { deployed: false, reported: 1 });
+  assert.deepEqual(denied.sleeps, []);
+  assert.ok(denied.infos.includes("Checking the live deployment failed: HttpError (HTTP 403)"));
+  assert.ok(!denied.infos.join("\n").includes("secret"));
+
+  // No valid commit, a failed deployment or nothing to report: the deployments are not looked at.
+  for (const [result, headSha, list] of [["cancelled", undefined, results], ["cancelled", "not-a-sha", results], ["failure", HEAD_SHA, results], ["cancelled", HEAD_SHA, []]]) {
+    const other = await runReport(result, list, { headSha, deployments: { polls, contains: new Set([`${HEAD_SHA}...${OLD_SHA}`]) } });
+    assert.deepEqual(other.deployCalls, [], `${result} ${headSha}`);
+    assert.equal(other.outcome.deployed, false);
+  }
 });
 
 test("report: the failed or cancelled notice is one comment per Issue, updated in place by later runs", async () => {

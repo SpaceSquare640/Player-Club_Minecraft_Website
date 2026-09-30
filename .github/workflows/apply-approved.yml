@@ -73,9 +73,12 @@ jobs:
     needs: [apply, deploy]
     if: always() && needs.apply.result == 'success' && needs.deploy.result != 'skipped'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    # After a cancelled deployment, report waits up to about 10 minutes for a newer one that contains the
+    # commit; deployments: read lists the github-pages deployments, contents: read compares the commits.
+    timeout-minutes: 15
     permissions:
       contents: read
+      deployments: read
       issues: write
     steps:
       - name: Check out Source_Code
@@ -98,6 +101,7 @@ jobs:
         env:
           DEPLOY_RESULT: ${{ needs.deploy.result }}
           APPLY_RESULTS: ${{ needs.apply.outputs.results }}
+          HEAD_SHA: ${{ needs.apply.outputs.head_sha }}
         with:
           script: |
             const { report } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/apply-requests.mjs`);

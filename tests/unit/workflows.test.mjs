@@ -211,9 +211,14 @@ test("apply-approved: approved label, daily schedule or manual run; one writer a
   }
   // deploy: only when something was written or waits for closing; serialized with every other deployment
   assert.match(yaml, /^ {2}deploy:\n {4}needs: apply\n {4}if: needs\.apply\.outputs\.needs_deploy == 'true'\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ needs\.apply\.outputs\.head_sha \}\}/m);
-  // report: runs after a deployment attempt (also when it failed or was cancelled); values through env only
-  assert.match(yaml, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: always\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped'\n[\s\S]*?permissions:\n {6}contents: read\n {6}issues: write\n/m);
-  assert.match(yaml, /env:\n {10}DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}\n {10}APPLY_RESULTS: \$\{\{ needs\.apply\.outputs\.results \}\}/);
+  // report: runs after a deployment attempt (also when it failed or was cancelled); values through env only.
+  // deployments: read (and contents: read for the compare API) lets it check whether a newer deployment
+  // that replaced a cancelled one contains the commit; it waits up to about 10 minutes for that.
+  const reportJob = jobsOf(yaml).find((j) => j.name === "report").text;
+  assert.match(reportJob, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: always\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped'\n/);
+  assert.match(reportJob, /\n {4}timeout-minutes: 15\n(?: {4}#.*\n)*? {4}permissions:\n {6}contents: read\n {6}deployments: read\n {6}issues: write\n {4}steps:\n/);
+  assert.deepEqual(Object.values(workflows).flatMap((y) => [...y.matchAll(/^\s*deployments: \S+$/gm)].map((m) => m[0].trim())), ["deployments: read"], "only report reads deployments");
+  assert.match(yaml, /env:\n {10}DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}\n {10}APPLY_RESULTS: \$\{\{ needs\.apply\.outputs\.results \}\}\n {10}HEAD_SHA: \$\{\{ needs\.apply\.outputs\.head_sha \}\}\n/);
   assert.match(yaml, /const \{ report \} = await import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/apply-requests\.mjs`\);\n {12}await report\(\{ github, context, core \}\);/);
   assert.match(yaml, /^ {2}apply:\n[\s\S]*?timeout-minutes: 10\n/m);
   assert.deepEqual(expressions(yaml), [
