@@ -65,15 +65,17 @@ jobs:
     concurrency:
       group: pages-deploy
       cancel-in-progress: false
+      queue: max
     uses: ./.github/workflows/_deploy-pages.yml
     with:
       expected_sha: ${{ needs.apply.outputs.head_sha }}
 
   # !cancelled() instead of always(): cancelled() is true only when the workflow run itself was cancelled
   # (for example by the owner). report is then skipped, or cancelled at once when it is already running,
-  # because the server re-evaluates the if of running jobs when a run is cancelled. A deploy job replaced
-  # in the pages-deploy queue is cancelled on its own (needs.deploy.result == 'cancelled') while the run
-  # goes on, so report still runs and checks whether the newer deployment is live.
+  # because the server re-evaluates the if of running jobs when a run is cancelled. Pending deploy jobs
+  # wait in order in the pages-deploy queue (queue: max) instead of replacing each other; a deploy job that
+  # still ends cancelled on its own (needs.deploy.result == 'cancelled') while the run goes on leaves report
+  # running, and it checks whether a newer deployment that contains the commit is live.
   report:
     needs: [apply, deploy]
     if: ${{ !cancelled() && needs.apply.result == 'success' && needs.deploy.result != 'skipped' }}
@@ -85,11 +87,12 @@ jobs:
       contents: read
       deployments: read
       issues: write
-    # One report at a time, so two runs cannot both create the deploy status comment of an Issue. A pending
-    # report replaced by a newer one loses nothing: the newer run's scan lists every Issue still open.
+    # One report at a time, so two runs cannot both create the deploy status comment of an Issue. Pending
+    # reports wait in order (queue: max) instead of replacing each other, so every run reports its own Issues.
     concurrency:
       group: apply-report
       cancel-in-progress: false
+      queue: max
     steps:
       - name: Check out Source_Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

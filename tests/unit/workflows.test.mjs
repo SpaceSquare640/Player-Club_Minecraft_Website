@@ -156,22 +156,37 @@ test("every checkout drops the token except the one that pushes approved request
   }
 });
 
-test("concurrency: only apply is in source-code-writer, so no other writer can replace a pending apply", () => {
-  // GitHub keeps one pending job per group and cancels the older pending one when another is queued.
-  const writers = [];
+test("concurrency: only apply is in source-code-writer; deployments and reports wait in order (queue: max)", () => {
+  // Without queue, GitHub keeps one pending job per group and cancels the older pending one when another is
+  // queued. queue: max keeps up to 100 pending jobs in order (never with cancel-in-progress: true). The two
+  // writer groups keep the default: a pending writer may be replaced only by a newer run of the same writer,
+  // which scans or regenerates everything again. A newer validation of the same Issue cancels the older one.
+  const groups = [];
   for (const [name, yaml] of Object.entries(workflows)) {
+    assert.doesNotMatch(yaml, /^concurrency:/m, `${name}: no workflow-level concurrency`);
     for (const job of jobsOf(yaml)) {
-      if (!/^ {6}contents: write$/m.test(job.text)) continue;
-      const queue = /^ {4}concurrency:\n {6}group: (\S+)\n {6}cancel-in-progress: (\S+)\n/m.exec(job.text);
-      assert.ok(queue, `${name}: ${job.name} has a concurrency group`);
-      assert.equal(queue[2], "false", `${name}: ${job.name} never cancels a running writer`);
-      writers.push([`${name}:${job.name}`, queue[1]]);
+      const block = /^ {4}concurrency:\n((?: {6}.*\n)+)/m.exec(job.text);
+      if (!block) {
+        assert.doesNotMatch(job.text, /^ {6}contents: write$/m, `${name}: ${job.name} writes without a concurrency group`);
+        continue;
+      }
+      const keys = Object.fromEntries([...block[1].matchAll(/^ {6}([a-z-]+): (\S.*)$/gm)].map(([, key, value]) => [key, value]));
+      assert.equal(Object.keys(keys).length, block[1].split("\n").filter(Boolean).length, `${name}: ${job.name}: one plain value per line`);
+      groups.push([`${name}:${job.name}`, keys]);
     }
   }
-  assert.deepEqual(writers.sort(), [
-    ["apply-approved.yml:apply", "source-code-writer"],
-    ["publish.yml:forms", "issue-forms-writer"],
+  const writer = (group) => ({ group, "cancel-in-progress": "false" });
+  const queued = (group) => ({ group, "cancel-in-progress": "false", queue: "max" });
+  assert.deepEqual(groups.sort(([a], [b]) => (a < b ? -1 : 1)), [
+    ["apply-approved.yml:apply", writer("source-code-writer")],
+    ["apply-approved.yml:deploy", queued("pages-deploy")],
+    ["apply-approved.yml:report", queued("apply-report")],
+    ["publish.yml:deploy", queued("pages-deploy")],
+    ["publish.yml:forms", writer("issue-forms-writer")],
+    ["validate-issue.yml:validate", { group: "validate-issue-${{ github.event.issue.number }}", "cancel-in-progress": "true" }],
   ]);
+  const all = Object.values(workflows).join("\n");
+  assert.equal(all.match(/^\s*queue:/gm)?.length, 3, "queue is set only in the three groups above");
   const shared = Object.entries(workflows).flatMap(([name, yaml]) => [...yaml.matchAll(/group: source-code-writer$/gm)].map(() => name));
   assert.deepEqual(shared, ["apply-approved.yml"]);
 });
@@ -493,8 +508,8 @@ test("publish: check with the push baseline, read-only forms check, forms writer
   assert.match(yaml, /user\.name="github-actions\[bot\]" -c user\.email="41898282\+github-actions\[bot\]@users\.noreply\.github\.com"/);
   assert.match(yaml, /commit -q -m "chore\(forms\): regenerate issue forms"/);
   assert.match(yaml, /for attempt in 1 2 3 4; do/);
-  // deploy: reusable workflow in the pages-deploy queue
-  assert.match(yaml, /^ {2}deploy:\n {4}needs: check\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ github\.sha \}\}/m);
+  // deploy: reusable workflow in the pages-deploy queue, where pending deployments wait in order (queue: max)
+  assert.match(yaml, /^ {2}deploy:\n {4}needs: check\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {6}queue: max\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ github\.sha \}\}/m);
   assert.deepEqual(expressions(yaml), [
     "${{ github.event.before }}",
     "${{ github.sha }}",
@@ -521,16 +536,17 @@ test("apply-approved: approved label, daily schedule or manual run; one writer a
   for (const output of ["needs_deploy", "results", "head_sha"]) {
     assert.ok(yaml.includes(`\n      ${output}: $\{{ steps.apply.outputs.${output} }}\n`), output);
   }
-  // deploy: only when something was written or waits for closing; serialized with every other deployment
-  assert.match(yaml, /^ {2}deploy:\n {4}needs: apply\n {4}if: needs\.apply\.outputs\.needs_deploy == 'true'\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ needs\.apply\.outputs\.head_sha \}\}/m);
-  // report: runs after a deployment attempt (also when it failed or was replaced in the pages-deploy queue),
+  // deploy: only when something was written or waits for closing; serialized with every other deployment, in order (queue: max)
+  assert.match(yaml, /^ {2}deploy:\n {4}needs: apply\n {4}if: needs\.apply\.outputs\.needs_deploy == 'true'\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {6}queue: max\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ needs\.apply\.outputs\.head_sha \}\}/m);
+  // report: runs after a deployment attempt (also when it failed or ended cancelled on its own),
   // but not when the run itself was cancelled (!cancelled(), not always()); values through env only.
   // deployments: read (and contents: read for the compare API) lets it check whether a newer deployment
-  // that replaced a cancelled one contains the commit; it waits up to about 10 minutes for that.
+  // that followed a cancelled one contains the commit; it waits up to about 10 minutes for that.
   const reportJob = jobsOf(yaml).find((j) => j.name === "report").text;
   assert.match(reportJob, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: \$\{\{ !cancelled\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped' \}\}\n/);
-  // One report at a time (apply-report), so two runs cannot both create the deploy status comment of an Issue.
-  assert.match(reportJob, /\n {4}timeout-minutes: 15\n {4}permissions:\n {6}contents: read\n {6}deployments: read\n {6}issues: write\n(?: {4}#.*\n)* {4}concurrency:\n {6}group: apply-report\n {6}cancel-in-progress: false\n {4}steps:\n/);
+  // One report at a time (apply-report), so two runs cannot both create the deploy status comment of an Issue;
+  // pending reports wait in order (queue: max), so no run loses its report.
+  assert.match(reportJob, /\n {4}timeout-minutes: 15\n {4}permissions:\n {6}contents: read\n {6}deployments: read\n {6}issues: write\n(?: {4}#.*\n)* {4}concurrency:\n {6}group: apply-report\n {6}cancel-in-progress: false\n {6}queue: max\n {4}steps:\n/);
   assert.equal(Object.values(workflows).join("\n").match(/group: apply-report$/gm)?.length, 1);
   assert.deepEqual(Object.values(workflows).flatMap((y) => [...y.matchAll(/^\s*deployments: \S+$/gm)].map((m) => m[0].trim())), ["deployments: read"], "only report reads deployments");
   assert.match(yaml, /env:\n {10}DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}\n {10}APPLY_RESULTS: \$\{\{ needs\.apply\.outputs\.results \}\}\n {10}HEAD_SHA: \$\{\{ needs\.apply\.outputs\.head_sha \}\}\n/);

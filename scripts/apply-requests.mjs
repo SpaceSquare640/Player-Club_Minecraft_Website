@@ -16,12 +16,13 @@
 //   Label and comment changes happen only after the push succeeded (or when nothing was committed), so a
 //   scan that is thrown away leaves no trace. Outputs: needs_deploy, results (JSON), head_sha.
 // report (job report): after the deployment, applied Issues get a comment with the site link, the applied
-//   label and are closed, but only when the deployment succeeded, or when it was cancelled (replaced by a
-//   newer one) and within about 10 minutes the live github-pages deployment is a commit that contains
-//   head_sha. Otherwise a cancelled deployment only gets a comment; a failed one also gets deploy-failed. Both
-//   keep approved and stay open, so the next scan deploys again and closes them. All three notices are one
-//   comment per Issue (the deploy status comment), updated in place by later runs: a failed or cancelled
-//   notice becomes the published notice with the site link. Report jobs run one at a time (apply-report).
+//   label and are closed, but only when the deployment succeeded, or when it was cancelled and within about
+//   10 minutes the live github-pages deployment is a commit that contains head_sha (pending deploy jobs wait
+//   in order in pages-deploy, queue: max, so a cancelled one is rare). Otherwise a cancelled deployment only
+//   gets a comment; a failed one also gets deploy-failed. Both keep approved and stay open, so the next scan
+//   deploys again and closes them. All three notices are one comment per Issue (the deploy status comment),
+//   updated in place by later runs: a failed or cancelled notice becomes the published notice with the site
+//   link. Report jobs run one at a time, in order (apply-report, queue: max).
 // Local: node scripts/apply-requests.mjs --event <event.json> --dry-run   (prints what would be written)
 
 import { readFile, writeFile } from "node:fs/promises";

@@ -301,6 +301,7 @@ jobs:
     concurrency:
       group: pages-deploy
       cancel-in-progress: false
+      queue: max
     uses: ./.github/workflows/_deploy-pages.yml
     with:
       expected_sha: ${{ github.sha }}
