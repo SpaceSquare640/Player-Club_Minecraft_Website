@@ -104,7 +104,7 @@ test("every job runs on the pinned ubuntu-24.04 image (ubuntu-latest moves to a 
     }
     assert.equal([...yaml.matchAll(/runs-on:/g)].length, jobs.filter((j) => !/^ {4}uses: /m.test(j.text)).length, `${name}: one runs-on per job`);
   }
-  assert.equal(runners, 8);
+  assert.equal(runners, 9);
 });
 
 test("every workflow: shell scripts contain no expressions and no Issue or comment content is referenced", () => {
@@ -151,7 +151,7 @@ test("concurrency: only apply is in source-code-writer, so no other writer can r
   assert.deepEqual(shared, ["apply-approved.yml"]);
 });
 
-test("a token passed through env reaches only steps that run git and shell, never node, npm or npx", () => {
+test("a token passed through env reaches only steps that run git, gh and shell, never node, npm or npx", () => {
   const tokenSteps = [];
   for (const [name, yaml] of Object.entries(workflows)) {
     for (const job of jobsOf(yaml)) {
@@ -162,12 +162,47 @@ test("a token passed through env reaches only steps that run git and shell, neve
         assert.doesNotMatch(step, /\b(node|npm|npx)\b/, `${where} runs node, npm or npx`);
         assert.doesNotMatch(step, /^\s*uses:/m, `${where} hands the token to an action`);
         const gitLines = step.split("\n").filter((line) => /(^|\s)git\s/.test(line));
-        assert.ok(gitLines.length > 0, where);
         for (const line of gitLines) assert.match(line, /\bgit -c core\.hooksPath=\/dev\/null /, `${where}: git hooks are off: ${line.trim()}`);
       }
     }
   }
-  assert.deepEqual(tokenSteps, ["publish.yml: forms: name: Push the Issue Forms"]);
+  assert.deepEqual(tokenSteps, [
+    "publish.yml: forms: name: Push the Issue Forms",
+    "publish.yml: forms-recover: name: Run this workflow again to regenerate the Issue Forms",
+  ]);
+});
+
+test("publish forms-recover: a conflict starts one recovery run, and a recovery run never starts another", () => {
+  const yaml = workflows["publish.yml"];
+  assert.match(yaml, /^ {2}workflow_dispatch:\n {4}inputs:\n {6}forms_recovery:\n {8}description: .+\n {8}type: boolean\n {8}default: false\n/m);
+  const jobs = Object.fromEntries(jobsOf(yaml).map((j) => [j.name, j.text]));
+  assert.match(jobs.forms, /\n {4}outputs:\n {6}conflict: \$\{\{ steps\.push\.outputs\.conflict \}\}\n/);
+  const push = stepsOf(jobs.forms).at(-1);
+  assert.match(push, /^name: Push the Issue Forms\n {8}id: push\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {10}FORMS_RECOVERY: \$\{\{ inputs\.forms_recovery \}\}\n/);
+  // A rebase conflict: fail in a recovery run, otherwise report conflict=true and end the job cleanly.
+  const onConflict = [
+    'rebase --onto "$remote" HEAD~1; then',
+    "rebase --abort || true",
+    'if [ "$FORMS_RECOVERY" = "true" ]; then',
+    "exit 1",
+    'echo "conflict=true" >> "$GITHUB_OUTPUT"',
+    "exit 0",
+  ].reduce((from, s) => {
+    const at = push.indexOf(s, from);
+    assert.ok(at > from, s);
+    return at;
+  }, -1);
+  assert.ok(onConflict > 0);
+  const recover = jobs["forms-recover"];
+  assert.match(recover, /^ {2}forms-recover:\n {4}needs: forms\n {4}if: needs\.forms\.outputs\.conflict == 'true' && inputs\.forms_recovery != true\n {4}runs-on: ubuntu-24\.04\n {4}timeout-minutes: 5\n {4}permissions:\n {6}actions: write\n {4}steps:\n/);
+  const steps = stepsOf(recover);
+  assert.equal(steps.length, 1);
+  assert.equal(
+    steps[0],
+    'name: Run this workflow again to regenerate the Issue Forms\n        env:\n          GH_TOKEN: ${{ github.token }}\n        run: gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/dispatches" -f ref=Source_Code -f "inputs[forms_recovery]=true"\n\n',
+  );
+  const actionsWrite = Object.entries(workflows).flatMap(([name, y]) => jobsOf(y).filter((j) => /^ {6}actions: write$/m.test(j.text)).map((j) => `${name}:${j.name}`));
+  assert.deepEqual(actionsWrite, ["publish.yml:forms-recover"], "only forms-recover may start a run");
 });
 
 test("publish forms: generated in a read-only job without a token, handed over as a patch, pushed by a job without Node.js", () => {
@@ -220,7 +255,7 @@ test("publish forms: generated in a read-only job without a token, handed over a
   ].map((s) => apply.indexOf(s));
   assert.ok(applied.every((p, i) => p > (applied[i - 1] ?? -1)), JSON.stringify(applied));
   assert.doesNotMatch(apply, /git (am|apply --3way|apply --unsafe-paths)/);
-  assert.match(push, /^name: Push the Issue Forms\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {8}run: \|\n/);
+  assert.match(push, /^name: Push the Issue Forms\n {8}id: push\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n/);
   assertFormsPushLoop(push);
 });
 
@@ -261,11 +296,13 @@ test("publish: check with the push baseline, read-only forms check, forms writer
     "${{ github.event.before }}",
     "${{ github.sha }}",
     "${{ github.token }}",
+    "${{ inputs.forms_recovery }}",
     "${{ needs.forms-check.outputs.base }}",
     "${{ needs.forms-check.outputs.patch }}",
     "${{ steps.forms.outputs.base }}",
     "${{ steps.forms.outputs.patch }}",
     "${{ steps.forms.outputs.stale }}",
+    "${{ steps.push.outputs.conflict }}",
   ]);
 });
 

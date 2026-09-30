@@ -7,6 +7,8 @@
 # on the commit it was made from and pushes. It has its own issue-forms-writer queue: sharing one with
 # apply-approved would let a pending forms job replace (cancel) a pending apply job. A push that races
 # with another writer is rejected and retried (see the step comment).
+# forms-recover: when the forms on Source_Code changed while forms ran (a conflict), it starts one more run
+# of this workflow (forms_recovery=true) that regenerates them; a recovery run never starts another.
 # deploy: the reusable Pages deployment (always the current Source_Code HEAD).
 # Commits pushed with GITHUB_TOKEN (the bot) do not trigger this workflow.
 name: Publish
@@ -22,6 +24,11 @@ on:
       - "package-lock.json"
       - ".github/workflows/**"
   workflow_dispatch:
+    inputs:
+      forms_recovery:
+        description: Set by forms-recover after an Issue Forms conflict; such a run never starts another
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -112,6 +119,8 @@ jobs:
     concurrency:
       group: issue-forms-writer
       cancel-in-progress: false
+    outputs:
+      conflict: ${{ steps.push.outputs.conflict }}
     steps:
       - name: Check out Source_Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -168,9 +177,13 @@ jobs:
       # remote head (rebase --onto its parent), at most 3 more times; after the move exactly that commit may
       # lie ahead of the remote, touching .github/ISSUE_TEMPLATE/ only. Only an owner push changes what the
       # generator reads (world names and ids, tags, dictionaries, config), and such a push runs this workflow again.
+      # When the move conflicts (the forms on Source_Code changed meanwhile), the job ends with conflict=true
+      # and forms-recover starts one more run that regenerates them; in that run a conflict fails the job.
       - name: Push the Issue Forms
+        id: push
         env:
           GH_TOKEN: ${{ github.token }}
+          FORMS_RECOVERY: ${{ inputs.forms_recovery }}
         run: |
           auth_b64="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           echo "::add-mask::$auth_b64"
@@ -189,8 +202,13 @@ jobs:
             if ! git -c core.hooksPath=/dev/null -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               rebase --onto "$remote" HEAD~1; then
               git -c core.hooksPath=/dev/null rebase --abort || true
-              echo "::error::The Issue Forms commit could not be moved onto the remote Source_Code"
-              exit 1
+              if [ "$FORMS_RECOVERY" = "true" ]; then
+                echo "::error::The Issue Forms conflict again in the recovery run; run this workflow manually"
+                exit 1
+              fi
+              echo "::warning::The Issue Forms on Source_Code changed meanwhile; a new run regenerates them"
+              echo "conflict=true" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
             ahead="$(git -c core.hooksPath=/dev/null rev-list --count "$remote..HEAD")"
             if [ "$ahead" = 0 ]; then
@@ -205,6 +223,22 @@ jobs:
           done
           echo "::error::Could not push the regenerated Issue Forms"
           exit 1
+
+  # After a conflict, one more run of this workflow (forms_recovery=true) regenerates the Issue Forms from
+  # the current Source_Code. Only this job holds actions: write, it runs one API call and no code from the
+  # repository, and it never runs in a recovery run, so a conflict can start at most one more run.
+  forms-recover:
+    needs: forms
+    if: needs.forms.outputs.conflict == 'true' && inputs.forms_recovery != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Run this workflow again to regenerate the Issue Forms
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/publish.yml/dispatches" -f ref=Source_Code -f "inputs[forms_recovery]=true"
 
   deploy:
     needs: check
