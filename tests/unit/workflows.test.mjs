@@ -401,7 +401,9 @@ test("apply-approved: approved label, daily schedule or manual run; one writer a
   // that replaced a cancelled one contains the commit; it waits up to about 10 minutes for that.
   const reportJob = jobsOf(yaml).find((j) => j.name === "report").text;
   assert.match(reportJob, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: \$\{\{ !cancelled\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped' \}\}\n/);
-  assert.match(reportJob, /\n {4}timeout-minutes: 15\n(?: {4}#.*\n)*? {4}permissions:\n {6}contents: read\n {6}deployments: read\n {6}issues: write\n {4}steps:\n/);
+  // One report at a time (apply-report), so two runs cannot both create the deploy status comment of an Issue.
+  assert.match(reportJob, /\n {4}timeout-minutes: 15\n {4}permissions:\n {6}contents: read\n {6}deployments: read\n {6}issues: write\n(?: {4}#.*\n)* {4}concurrency:\n {6}group: apply-report\n {6}cancel-in-progress: false\n {4}steps:\n/);
+  assert.equal(Object.values(workflows).join("\n").match(/group: apply-report$/gm)?.length, 1);
   assert.deepEqual(Object.values(workflows).flatMap((y) => [...y.matchAll(/^\s*deployments: \S+$/gm)].map((m) => m[0].trim())), ["deployments: read"], "only report reads deployments");
   assert.match(yaml, /env:\n {10}DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}\n {10}APPLY_RESULTS: \$\{\{ needs\.apply\.outputs\.results \}\}\n {10}HEAD_SHA: \$\{\{ needs\.apply\.outputs\.head_sha \}\}\n/);
   assert.match(yaml, /const \{ report \} = await import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/apply-requests\.mjs`\);\n {12}await report\(\{ github, context, core \}\);/);

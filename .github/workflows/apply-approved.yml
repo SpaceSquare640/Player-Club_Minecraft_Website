@@ -85,6 +85,11 @@ jobs:
       contents: read
       deployments: read
       issues: write
+    # One report at a time, so two runs cannot both create the deploy status comment of an Issue. A pending
+    # report replaced by a newer one loses nothing: the newer run's scan lists every Issue still open.
+    concurrency:
+      group: apply-report
+      cancel-in-progress: false
     steps:
       - name: Check out Source_Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

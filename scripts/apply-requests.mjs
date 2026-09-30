@@ -19,8 +19,9 @@
 //   label and are closed, but only when the deployment succeeded, or when it was cancelled (replaced by a
 //   newer one) and within about 10 minutes the live github-pages deployment is a commit that contains
 //   head_sha. Otherwise a cancelled deployment only gets a comment; a failed one also gets deploy-failed. Both
-//   keep approved and stay open, so the next scan deploys again and closes them. That comment is one per
-//   Issue (the deploy status comment), updated in place by later runs.
+//   keep approved and stay open, so the next scan deploys again and closes them. All three notices are one
+//   comment per Issue (the deploy status comment), updated in place by later runs: a failed or cancelled
+//   notice becomes the published notice with the site link. Report jobs run one at a time (apply-report).
 // Local: node scripts/apply-requests.mjs --event <event.json> --dry-run   (prints what would be written)
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -499,7 +500,8 @@ export async function report({
     for (const r of results) {
       try {
         if (deployed) {
-          await createComment(github, repo, r.issue, renderAppliedComment({ url: siteLink(config, r), pointId: r.kind === "add" ? r.pointId : null }));
+          const applied = renderAppliedComment({ url: siteLink(config, r), pointId: r.kind === "add" ? r.pointId : null });
+          await upsertBotComment(github, repo, r.issue, applied, isDeployStatusBody);
           await addLabels(github, repo, r.issue, [LABELS.applied]);
           await removeLabel(github, repo, r.issue, LABELS.pendingReview);
           await removeLabel(github, repo, r.issue, LABELS.deployFailed);

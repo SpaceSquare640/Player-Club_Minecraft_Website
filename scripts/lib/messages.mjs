@@ -416,22 +416,10 @@ export function renderRejectedComment({ problems = [], dataIssues = [] } = {}) {
   return lines.join("\n");
 }
 
-/** Written and published. url is built from config.siteUrl and validated ids only. */
-export function renderAppliedComment({ url, pointId = null }) {
-  const lines = [RESULT_MARKER, "### Applied / 已寫入", "", `The request was applied and published: ${url}`, `請求已寫入並發布：${url}`];
-  if (pointId) lines.push("", `Point ID / 座標 ID：${code(pointId)}`);
-  lines.push(
-    "",
-    "> [!NOTE]",
-    "> The site can take about 10 minutes to show the change (page cache).",
-    "> 網站快取約 10 分鐘，更新可能稍後才會顯示。",
-  );
-  return lines.join("\n");
-}
-
 /**
- * Last line of the deploy status comment (publishing failed or cancelled). Each Issue has at most one: later
- * runs update it in place instead of adding another comment.
+ * Last line of the deploy status comment (applied and published, publishing failed or cancelled). Each Issue
+ * has at most one: later runs update it in place instead of adding another comment, so a failed or
+ * cancelled notice turns into the published notice once a deployment succeeds.
  */
 export const DEPLOY_STATUS_MARKER = "<!-- pcmw:deploy-status -->";
 
@@ -440,6 +428,20 @@ export function isDeployStatusBody(body) {
   if (typeof body !== "string") return false;
   const lines = body.replace(/\r\n?/g, "\n").split("\n").map((l) => l.trim()).filter(Boolean);
   return lines[0] === RESULT_MARKER && lines.at(-1) === DEPLOY_STATUS_MARKER;
+}
+
+/** Written and published. url is built from config.siteUrl and validated ids only. */
+export function renderAppliedComment({ url, pointId = null }) {
+  const lines = [RESULT_MARKER, "### Applied and published / 已寫入並發布", "", `The request was applied and published: ${url}`, `請求已寫入並發布：${url}`];
+  if (pointId) lines.push("", `Point ID / 座標 ID：${code(pointId)}`);
+  lines.push(
+    "",
+    "> [!NOTE]",
+    "> The site can take about 10 minutes to show the change (page cache).",
+    "> 網站快取約 10 分鐘，更新可能稍後才會顯示。",
+    DEPLOY_STATUS_MARKER,
+  );
+  return lines.join("\n");
 }
 
 /** Written, but the deployment failed; the next run deploys again and closes the Issue. */

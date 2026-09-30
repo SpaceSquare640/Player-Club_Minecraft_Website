@@ -836,6 +836,36 @@ test("report: a cancelled deployment stays cancelled unless a live deployment is
   }
 });
 
+test("report: a successful deployment turns the failed or cancelled notice into the published notice in place", async () => {
+  const dataset = createDataset();
+  const entry = approvedEntry(dataset, "add", ADD_VALUES, { number: 12 });
+  const forged = { id: 3, user: { login: "friend-01", type: "User" }, body: `${RESULT_MARKER}\n### Publishing failed / 發布失敗\n${DEPLOY_STATUS_MARKER}`, created_at: REPORT_AT, updated_at: REPORT_AT };
+  entry.comments.push(forged);
+  const gh = fakeGithub([entry]);
+  const results = [{ issue: 12, status: "applied", kind: "add", pointId: "p0003", worldId: "player_club" }];
+  await runReport("cancelled", results, { gh, dataset });
+  const notice = gh.get(12).comments.at(-1);
+  const count = gh.get(12).comments.length;
+  await runReport("success", results, { gh, dataset });
+  // A second report that lists the same Issue (for example from another run) adds nothing either.
+  await runReport("success", results, { gh, dataset });
+
+  const comments = gh.get(12).comments;
+  assert.equal(comments.length, count, "no new comment");
+  const notices = comments.filter((c) => c.user === BOT && isDeployStatusBody(c.body));
+  assert.deepEqual(notices.map((c) => c.id), [notice.id], "the same comment, updated in place");
+  const lines = notices[0].body.split("\n");
+  assert.equal(lines[1], "### Applied and published / 已寫入並發布");
+  assert.equal(lines[3], "The request was applied and published: https://spacesquare640.github.io/Player-Club_Minecraft_Website/#point=p0003", "English first, with the link");
+  assert.equal(lines[4], "請求已寫入並發布：https://spacesquare640.github.io/Player-Club_Minecraft_Website/#point=p0003");
+  assert.equal(comments.find((c) => c.id === 3).body, forged.body, "comments by anyone else are never touched");
+  assert.deepEqual(
+    gh.mutations().filter(([name]) => name === "createComment" || name === "updateComment"),
+    [["createComment", 12], ["updateComment", 12], ["updateComment", 12]],
+  );
+  assert.equal(gh.get(12).state, "closed");
+});
+
 test("report: the failed or cancelled notice is one comment per Issue, updated in place by later runs", async () => {
   const dataset = createDataset();
   const entry = approvedEntry(dataset, "add", ADD_VALUES, { number: 12 });
