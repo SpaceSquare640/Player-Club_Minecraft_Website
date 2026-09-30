@@ -2,6 +2,7 @@
 // pinned to full commit SHAs, no expressions inside shell scripts, no user-controlled values anywhere.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { REPO_ROOT } from "../../scripts/lib/load-data.mjs";
@@ -65,13 +66,25 @@ function assertFormsPushLoop(step) {
     "rebase --abort",
     'rev-list --count "$remote..HEAD"',
     'if [ "$ahead" = 0 ]; then',
-    'diff --name-only "$remote" HEAD',
-    String.raw`if [ "$ahead" != 1 ] || [ -z "$changed" ] || printf '%s\n' "$changed" | grep -qv '^\.github/ISSUE_TEMPLATE/[^/]*$'; then`,
+    'changed="$(git -c core.hooksPath=/dev/null diff --no-renames --name-status "$remote" HEAD)"',
+    'modes="$(git -c core.hooksPath=/dev/null diff --no-renames --no-abbrev --raw "$remote" HEAD)"',
+    `if [ "$ahead" != 1 ] || [ -z "$changed" ] || printf '%s\\n' "$changed" | grep -Eqvx "[AM]$tab$allowed" \\`,
+    String.raw`|| printf '%s\n' "$modes" | grep -Eqvx ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed"; then`,
   ];
   const positions = order.map((s) => step.indexOf(s));
   assert.ok(positions.every((p, i) => p > (positions[i - 1] ?? -1)), JSON.stringify(positions));
-  assert.doesNotMatch(step, /rebase refs\/remotes|rebase "\$remote"\n|reset --hard|gen-issue-forms/);
+  assert.ok(step.includes(`\n${" ".repeat(10)}${ALLOWED_LINE}\n${" ".repeat(10)}${TAB_LINE}\n`), "allowed and tab are defined in the push step");
+  assert.doesNotMatch(step, /rebase refs\/remotes|rebase "\$remote"\n|reset --hard|gen-issue-forms|--name-only/);
 }
+
+/** The allowed paths and the tab character, defined the same way in both forms steps. */
+const ALLOWED_LINE = String.raw`allowed='\.github/ISSUE_TEMPLATE/[A-Za-z0-9_-][A-Za-z0-9._-]*\.yml'`;
+const TAB_LINE = String.raw`tab="$(printf '\t')"`;
+/** Shell (grep -E) patterns of the forms patch checks, as written in publish.yml. */
+const PATCH_DENY = String.raw`^(rename|copy) (from|to|old|new) |^(old|new) mode |^deleted file mode |^(dis)?similarity index |^GIT binary patch|^Binary files `;
+const SUMMARY_ALLOWED = " create mode 100644 $allowed";
+const STAGED_ALLOWED = "[AM]$tab$allowed";
+const RAW_ALLOWED = ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed";
 
 test("the four workflows exist", () => {
   for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
@@ -237,26 +250,78 @@ test("publish forms: generated in a read-only job without a token, handed over a
   assert.doesNotMatch(apply, /token|auth/i, "no token while the patch is checked and applied");
   assert.match(apply, /^name: Check and commit the Issue Forms patch\n {8}env:\n {10}FORMS_BASE: \$\{\{ needs\.forms-check\.outputs\.base \}\}\n {10}FORMS_PATCH: \$\{\{ needs\.forms-check\.outputs\.patch \}\}\n {8}run: \|\n/);
   const applied = [
-    "allowed='\\.github/ISSUE_TEMPLATE/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.yml'",
+    ALLOWED_LINE,
+    TAB_LINE,
     "grep -Eqx '[0-9a-f]{40}([0-9a-f]{24})?'",
     'merge-base --is-ancestor "$FORMS_BASE" HEAD; then',
     'printf \'%s\' "$FORMS_PATCH" | base64 -d > "$patch_file"',
-    "grep -Eq '^(rename|copy) (from|to) |^(old|new) mode |^deleted file mode |^similarity index |^GIT binary patch|^Binary files ' \"$patch_file\"",
+    `grep -Eq '${PATCH_DENY}' "$patch_file"`,
     "grep -qvx 'new file mode 100644'",
     'grep -Eqvx "diff --git a/($allowed) b/\\\\1"',
     'grep -Eqvx -e "--- a/$allowed|\\+\\+\\+ b/$allowed|--- /dev/null"; then',
+    'summary="$(git -c core.hooksPath=/dev/null apply --summary "$patch_file")"',
+    `if [ -n "$summary" ] && printf '%s\\n' "$summary" | grep -Eqvx -e "${SUMMARY_ALLOWED}"; then`,
     'apply --numstat "$patch_file" | cut -f3)"',
     'if [ -z "$paths" ] || printf \'%s\\n\' "$paths" | grep -Eqvx "$allowed"; then',
     'checkout -q --detach "$FORMS_BASE"',
     'apply --index "$patch_file"',
-    'staged="$(git -c core.hooksPath=/dev/null diff --cached --name-only)"',
-    'if [ -z "$staged" ] || printf \'%s\\n\' "$staged" | grep -Eqvx "$allowed"; then',
+    'staged="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --name-status)"',
+    'modes="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --no-abbrev --raw)"',
+    `if [ -z "$staged" ] || printf '%s\\n' "$staged" | grep -Eqvx "${STAGED_ALLOWED}" \\`,
+    `|| printf '%s\\n' "$modes" | grep -Eqvx "${RAW_ALLOWED}"; then`,
     'commit -q -m "chore(forms): regenerate issue forms"',
   ].map((s) => apply.indexOf(s));
   assert.ok(applied.every((p, i) => p > (applied[i - 1] ?? -1)), JSON.stringify(applied));
-  assert.doesNotMatch(apply, /git (am|apply --3way|apply --unsafe-paths)/);
+  assert.doesNotMatch(apply, /git (am|apply --3way|apply --unsafe-paths)|--name-only/);
   assert.match(push, /^name: Push the Issue Forms\n {8}id: push\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n/);
   assertFormsPushLoop(push);
+});
+
+test("publish forms: the patch checks refuse renames (rename old/new too), copies, deletions, mode changes and links", () => {
+  const allowed = /^allowed='([^']+)'$/.exec(ALLOWED_LINE)[1];
+  const whole = (pattern) => new RegExp(`^(?:${pattern.replaceAll("$allowed", allowed).replaceAll("$tab", "\t")})$`);
+  const deny = new RegExp(PATCH_DENY, "m");
+  const summaryLine = whole(SUMMARY_ALLOWED);
+  // git reads each patch from stdin, exactly as the workflow asks it to; nothing is applied or written.
+  const summaryOf = (patch) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--summary", "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8" });
+  const summaryAccepts = (patch) => summaryOf(patch).split("\n").filter(Boolean).every((line) => summaryLine.test(line));
+  const X = ".github/ISSUE_TEMPLATE/x.yml";
+  const patch = (from, to, ...lines) => [`diff --git a/${from} b/${to}`, ...lines, ""].join("\n");
+
+  const refused = {
+    "rename old / rename new": patch(X, X, "rename old site/data/config.json", `rename new ${X}`),
+    "rename from / rename to": patch(X, X, "similarity index 100%", "rename from site/data/config.json", `rename to ${X}`),
+    "dissimilarity index": patch(X, X, "dissimilarity index 100%", "rename old site/data/config.json", `rename new ${X}`),
+    "copy": patch(X, X, "similarity index 100%", "copy from site/data/config.json", `copy to ${X}`),
+    "deletion": patch(X, X, "deleted file mode 100644"),
+    "mode change": patch(X, X, "old mode 100644", "new mode 100755"),
+  };
+  for (const [name, text] of Object.entries(refused)) {
+    assert.ok(deny.test(text), `${name}: refused by the header check`);
+    assert.equal(summaryAccepts(text), false, `${name}: refused by git's own summary`);
+  }
+  const link = patch(X, X, "new file mode 120000", "index 0000000..1111111", "--- /dev/null", `+++ b/${X}`, "@@ -0,0 +1 @@", "+../../scripts", "\\ No newline at end of file");
+  assert.equal(summaryAccepts(link), false, "symbolic link: refused by git's own summary");
+
+  const added = patch(X, X, "new file mode 100644", "index 0000000..1111111", "--- /dev/null", `+++ b/${X}`, "@@ -0,0 +1 @@", "+name: x");
+  const changed = patch(X, X, "index 1111111..2222222 100644", `--- a/${X}`, `+++ b/${X}`, "@@ -1 +1 @@", "-name: x", "+name: y");
+  for (const [name, text] of [["added", added], ["changed", changed]]) {
+    assert.equal(deny.test(text), false, name);
+    assert.equal(summaryAccepts(text), true, name);
+  }
+
+  // Staged and pushed changes are listed without rename detection, so a move is a deletion (refused).
+  const staged = whole(STAGED_ALLOWED);
+  assert.ok(staged.test(`M\t${X}`) && staged.test(`A\t${X}`));
+  for (const line of ["D\tsite/data/config.json", `R100\tsite/data/config.json\t${X}`, "A\t.github/ISSUE_TEMPLATE/sub/x.yml", "M\tsite/data/config.json"]) {
+    assert.equal(staged.test(line), false, line);
+  }
+  const raw = whole(RAW_ALLOWED);
+  const sha = (c) => c.repeat(40);
+  assert.ok(raw.test(`:100644 100644 ${sha("a")} ${sha("b")} M\t${X}`) && raw.test(`:000000 100644 ${sha("0")} ${sha("b")} A\t${X}`));
+  for (const line of [`:100644 100755 ${sha("a")} ${sha("b")} M\t${X}`, `:000000 120000 ${sha("0")} ${sha("b")} A\t${X}`, `:100644 000000 ${sha("a")} ${sha("0")} D\t${X}`]) {
+    assert.equal(raw.test(line), false, line);
+  }
 });
 
 test("_deploy-pages: reusable, builds Source_Code HEAD containing the expected commit, validates, stamps, deploys", () => {
