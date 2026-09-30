@@ -1,6 +1,7 @@
 // Minimal git access through execFile (argument arrays, no shell).
 
 import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -64,25 +65,37 @@ export function requestTrailer(issueNumber) {
   return `${REQUEST_TRAILER}: #${issueNumber}`;
 }
 
-const RECORD = "\x1e";
-const FIELD = "\x1f";
-/** git log format: one record per commit with author name / e-mail, committer name / e-mail and the trailer values. */
-export const REQUEST_LOG_FORMAT = `%x1e%an%x1f%ae%x1f%cn%x1f%ce%x1f%(trailers:key=${REQUEST_TRAILER},valueonly)`;
+const SEPARATOR_RE = /^[0-9a-f]{32}$/;
+
+/** A fresh separator for one git log call: 128 random bits as hex, so no commit text can contain it. */
+export const newLogSeparator = () => randomBytes(16).toString("hex");
 
 /**
- * Issue numbers from `git log --format=REQUEST_LOG_FORMAT` output. Only commits whose author and committer
- * are both exactly BOT_IDENTITY count (the way commitFiles writes them); a trailer in any other commit is
- * ignored, including pull request commits that GitHub squashes or rebases on merge (GitHub becomes the
- * committer). Git identities are not authenticated: a commit with both identities set to the bot by hand
- * and merged unchanged (merge commit) still counts.
+ * git log format with sep: one record per commit ("<sep>R") with author name / e-mail, committer name /
+ * e-mail and the trailer values, each field starting with "<sep>F". Names, e-mails and trailer values may
+ * hold any text, control characters included; only the unpredictable separator marks the boundaries.
  */
-export function parseRequestLog(out) {
+export function requestLogFormat(sep) {
+  if (!SEPARATOR_RE.test(sep)) throw new TypeError("Invalid log separator");
+  return `${sep}R%an${sep}F%ae${sep}F%cn${sep}F%ce${sep}F%(trailers:key=${REQUEST_TRAILER},valueonly)`;
+}
+
+/**
+ * Issue numbers from `git log --format=requestLogFormat(sep)` output. Only commits whose author and
+ * committer are both exactly BOT_IDENTITY count (the way commitFiles writes them); a trailer in any other
+ * commit is ignored, including pull request commits that GitHub squashes or rebases on merge (GitHub
+ * becomes the committer). A record that does not split into exactly five fields is ignored.
+ * Git identities are not authenticated, so a commit whose author and committer were both set to the bot by
+ * hand still counts here.
+ */
+export function parseRequestLog(out, sep) {
+  if (!SEPARATOR_RE.test(sep)) throw new TypeError("Invalid log separator");
   const numbers = new Set();
-  for (const record of String(out ?? "").split(RECORD)) {
-    const fields = record.split(FIELD);
+  const bot = (name, email) => name === BOT_IDENTITY.name && email === BOT_IDENTITY.email;
+  for (const record of String(out ?? "").split(`${sep}R`).slice(1)) {
+    const fields = record.split(`${sep}F`);
     if (fields.length !== 5) continue;
     const [authorName, authorEmail, committerName, committerEmail, trailers] = fields;
-    const bot = (name, email) => name === BOT_IDENTITY.name && email === BOT_IDENTITY.email;
     if (!bot(authorName, authorEmail) || !bot(committerName, committerEmail)) continue;
     for (const line of trailers.split("\n")) {
       const m = /^#([1-9][0-9]{0,9})$/.exec(line.trim());
@@ -93,8 +106,9 @@ export function parseRequestLog(out) {
 }
 
 /** Issue numbers named by "Request-Issue: #<n>" trailers of bot commits in the history of HEAD. */
-export async function requestIssueNumbers(root, run = git) {
-  return parseRequestLog(await run(["log", `--format=${REQUEST_LOG_FORMAT}`, "HEAD"], { cwd: root }));
+export async function requestIssueNumbers(root, run = git, separator = newLogSeparator) {
+  const sep = separator();
+  return parseRequestLog(await run(["log", `--format=${requestLogFormat(sep)}`, "HEAD"], { cwd: root }), sep);
 }
 
 /** Current HEAD commit SHA. */

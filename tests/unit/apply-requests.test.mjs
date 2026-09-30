@@ -20,7 +20,7 @@ import {
   siteLink,
   subjectText,
 } from "../../scripts/apply-requests.mjs";
-import { BOT_IDENTITY, REQUEST_LOG_FORMAT, parseRequestLog, requestIssueNumbers } from "../../scripts/lib/git.mjs";
+import { BOT_IDENTITY, parseRequestLog, requestIssueNumbers, requestLogFormat } from "../../scripts/lib/git.mjs";
 import { evaluateRequest } from "../../scripts/lib/issue-parse.mjs";
 import { stringifyJson } from "../../scripts/lib/json-io.mjs";
 import { I18N_DIR, POINTS_DIR, listDataFiles, loadDataset } from "../../scripts/lib/load-data.mjs";
@@ -501,9 +501,14 @@ test("run is idempotent: a Request-Issue trailer or a change entry of the Issue 
   assert.equal(again.results[0].status, "already-applied");
 });
 
+const LOG_SEP = "0123456789abcdef0123456789abcdef";
+const logRecord = (an, ae, cn, ce, trailers = "") => `${LOG_SEP}R${an}${LOG_SEP}F${ae}${LOG_SEP}F${cn}${LOG_SEP}F${ce}${LOG_SEP}F${trailers}\n`;
+const sorted = (set) => [...set].sort((a, b) => a - b);
+
 test("Request-Issue trailers count only in commits authored and committed by the bot", async () => {
   const { name, email } = BOT_IDENTITY;
-  const record = (an, ae, cn, ce, trailers = "") => `\x1e${an}\x1f${ae}\x1f${cn}\x1f${ce}\x1f${trailers}\n`;
+  const record = logRecord;
+  const sep = LOG_SEP;
   const log = [
     record(name, email, name, email, "#4\n"), // written by commitFiles
     record("friend-01", "friend@example.com", "friend-01", "friend@example.com", "#9\n"), // pushed or merged from a pull request
@@ -512,21 +517,54 @@ test("Request-Issue trailers count only in commits authored and committed by the
     record("friend-01", "friend@example.com", name, email, "#5\n"), // other author, bot committer
     record(name.toUpperCase(), email, name, email, "#8\n"), // not exactly the bot
     record(name, email, name, email, "#3\n#11\nnot-a-number\n#0\n"), // several values; malformed ones ignored
-    `\x1e${name}\x1f${email}\x1f${name}\x1f${email}\n`, // too few fields
-    `\x1e${name}\x1f${email}\x1f${name}\x1f${email}\x1f#12\x1fextra\n`, // too many fields
+    `${sep}R${name}${sep}F${email}${sep}F${name}${sep}F${email}\n`, // too few fields
+    `${sep}R${name}${sep}F${email}${sep}F${name}${sep}F${email}${sep}F#12${sep}Fextra\n`, // too many fields
   ].join("\n");
-  assert.deepEqual([...parseRequestLog(log)].sort((a, b) => a - b), [3, 4, 11]);
-  assert.deepEqual([...parseRequestLog("")], []);
+  assert.deepEqual(sorted(parseRequestLog(log, sep)), [3, 4, 11]);
+  assert.deepEqual(sorted(parseRequestLog("", sep)), []);
+  assert.throws(() => parseRequestLog(log, ""), TypeError);
+  assert.throws(() => requestLogFormat("\x1e"), TypeError);
+  assert.equal(requestLogFormat(sep), `${sep}R%an${sep}F%ae${sep}F%cn${sep}F%ce${sep}F%(trailers:key=Request-Issue,valueonly)`);
 
   // requestIssueNumbers asks git for exactly this format over the history of HEAD.
   const calls = [];
-  const numbers = await requestIssueNumbers(ROOT, async (args, options) => {
-    calls.push([args, options]);
-    return log;
-  });
-  assert.deepEqual([...numbers].sort((a, b) => a - b), [3, 4, 11]);
-  assert.deepEqual(calls, [[["log", `--format=${REQUEST_LOG_FORMAT}`, "HEAD"], { cwd: ROOT }]]);
-  assert.equal(REQUEST_LOG_FORMAT, "%x1e%an%x1f%ae%x1f%cn%x1f%ce%x1f%(trailers:key=Request-Issue,valueonly)");
+  const numbers = await requestIssueNumbers(
+    ROOT,
+    async (args, options) => {
+      calls.push([args, options]);
+      return log;
+    },
+    () => sep,
+  );
+  assert.deepEqual(sorted(numbers), [3, 4, 11]);
+  assert.deepEqual(calls, [[["log", `--format=${requestLogFormat(sep)}`, "HEAD"], { cwd: ROOT }]]);
+
+  // Every call uses a fresh random separator.
+  const separators = [];
+  for (let i = 0; i < 2; i += 1) {
+    await requestIssueNumbers(ROOT, async (args) => {
+      separators.push(/^--format=([0-9a-f]{32})R%an/.exec(args[1])[1]);
+      return "";
+    });
+  }
+  assert.equal(separators.length, 2);
+  assert.notEqual(separators[0], separators[1]);
+});
+
+test("a non-bot commit cannot forge a bot record through control characters or a guessed separator", () => {
+  const { name, email } = BOT_IDENTITY;
+  const mallory = ["Mallory", "mallory@example.com"];
+  // The fixed separators of the earlier format, followed by a whole fake bot record.
+  const oldFake = `\x1e${name}\x1f${email}\x1f${name}\x1f${email}\x1f#12`;
+  const guess = "f".repeat(32);
+  const guessedFake = `${guess}R${name}${guess}F${email}${guess}F${name}${guess}F${email}${guess}F#13`;
+  const log = [
+    logRecord(...mallory, ...mallory, `#1\x1e\n${oldFake}\n`), // in the trailer value
+    logRecord(`Mallory${oldFake}`, mallory[1], ...mallory, "#14\n"), // in the author name
+    logRecord(...mallory, mallory[0], `${mallory[1]}\x1f${name}\x1f${email}\x1f#15`, "#15\n"), // in the committer e-mail
+    logRecord(...mallory, ...mallory, `${guessedFake}\n`), // a separator the attacker guessed
+  ].join("\n");
+  assert.deepEqual(sorted(parseRequestLog(log, LOG_SEP)), []);
 });
 
 test("run: a push rejected because Source_Code moved on is retried on the new remote head", async () => {
