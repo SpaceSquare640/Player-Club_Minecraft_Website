@@ -69,9 +69,14 @@ jobs:
     with:
       expected_sha: ${{ needs.apply.outputs.head_sha }}
 
+  # !cancelled() instead of always(): cancelled() is true only when the workflow run itself was cancelled
+  # (for example by the owner). report is then skipped, or cancelled at once when it is already running,
+  # because the server re-evaluates the if of running jobs when a run is cancelled. A deploy job replaced
+  # in the pages-deploy queue is cancelled on its own (needs.deploy.result == 'cancelled') while the run
+  # goes on, so report still runs and checks whether the newer deployment is live.
   report:
     needs: [apply, deploy]
-    if: always() && needs.apply.result == 'success' && needs.deploy.result != 'skipped'
+    if: ${{ !cancelled() && needs.apply.result == 'success' && needs.deploy.result != 'skipped' }}
     runs-on: ubuntu-24.04
     # After a cancelled deployment, report waits up to about 10 minutes for a newer one that contains the
     # commit; deployments: read lists the github-pages deployments, contents: read compares the commits.

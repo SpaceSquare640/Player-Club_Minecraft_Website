@@ -104,6 +104,16 @@ test("every workflow: no default permissions, pinned official actions or the loc
   }
 });
 
+test("no job or step uses always(): cancelling a run stops every job (status checks use !cancelled())", () => {
+  const code = Object.fromEntries(Object.entries(workflows).map(([name, yaml]) => [name, yaml.replace(/^ *#.*\n/gm, "")]));
+  for (const [name, yaml] of Object.entries(code)) {
+    assert.doesNotMatch(yaml, /always\(\)/, name);
+    // A plain YAML scalar that starts with "!" is a tag, so !cancelled() must be inside ${{ }}.
+    assert.doesNotMatch(yaml, /^\s*if: !/m, name);
+  }
+  assert.equal(Object.values(code).join("\n").match(/!cancelled\(\)/g)?.length, 1, "only report continues after failed jobs");
+});
+
 test("every job runs on the pinned ubuntu-24.04 image (ubuntu-latest moves to a new release on its own)", () => {
   let runners = 0;
   for (const [name, yaml] of Object.entries(workflows)) {
@@ -385,17 +395,19 @@ test("apply-approved: approved label, daily schedule or manual run; one writer a
   }
   // deploy: only when something was written or waits for closing; serialized with every other deployment
   assert.match(yaml, /^ {2}deploy:\n {4}needs: apply\n {4}if: needs\.apply\.outputs\.needs_deploy == 'true'\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ needs\.apply\.outputs\.head_sha \}\}/m);
-  // report: runs after a deployment attempt (also when it failed or was cancelled); values through env only.
+  // report: runs after a deployment attempt (also when it failed or was replaced in the pages-deploy queue),
+  // but not when the run itself was cancelled (!cancelled(), not always()); values through env only.
   // deployments: read (and contents: read for the compare API) lets it check whether a newer deployment
   // that replaced a cancelled one contains the commit; it waits up to about 10 minutes for that.
   const reportJob = jobsOf(yaml).find((j) => j.name === "report").text;
-  assert.match(reportJob, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: always\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped'\n/);
+  assert.match(reportJob, /^ {2}report:\n {4}needs: \[apply, deploy\]\n {4}if: \$\{\{ !cancelled\(\) && needs\.apply\.result == 'success' && needs\.deploy\.result != 'skipped' \}\}\n/);
   assert.match(reportJob, /\n {4}timeout-minutes: 15\n(?: {4}#.*\n)*? {4}permissions:\n {6}contents: read\n {6}deployments: read\n {6}issues: write\n {4}steps:\n/);
   assert.deepEqual(Object.values(workflows).flatMap((y) => [...y.matchAll(/^\s*deployments: \S+$/gm)].map((m) => m[0].trim())), ["deployments: read"], "only report reads deployments");
   assert.match(yaml, /env:\n {10}DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}\n {10}APPLY_RESULTS: \$\{\{ needs\.apply\.outputs\.results \}\}\n {10}HEAD_SHA: \$\{\{ needs\.apply\.outputs\.head_sha \}\}\n/);
   assert.match(yaml, /const \{ report \} = await import\(`\$\{process\.env\.GITHUB_WORKSPACE\}\/scripts\/apply-requests\.mjs`\);\n {12}await report\(\{ github, context, core \}\);/);
   assert.match(yaml, /^ {2}apply:\n[\s\S]*?timeout-minutes: 10\n/m);
   assert.deepEqual(expressions(yaml), [
+    "${{ !cancelled() && needs.apply.result == 'success' && needs.deploy.result != 'skipped' }}",
     "${{ needs.apply.outputs.head_sha }}",
     "${{ needs.apply.outputs.results }}",
     "${{ needs.deploy.result }}",
