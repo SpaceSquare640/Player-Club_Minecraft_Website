@@ -49,6 +49,30 @@ function jobsOf(yaml) {
 /** The steps of a job (text after "- "), comment lines left out. */
 const stepsOf = (jobText) => jobText.replace(/^ *#.*\n/gm, "").split(/^ {6}- /m).slice(1);
 
+/**
+ * The push loop of the Issue Forms writer: a rejected push moves only the one forms commit onto the remote
+ * head (its parent must be part of the remote), and afterwards exactly that commit, touching nothing but
+ * .github/ISSUE_TEMPLATE/, may be ahead of the remote.
+ */
+function assertFormsPushLoop(step) {
+  const order = [
+    "remote=refs/remotes/origin/Source_Code",
+    "for attempt in 1 2 3 4; do",
+    "push origin HEAD:refs/heads/Source_Code; then",
+    "fetch origin +refs/heads/Source_Code:$remote",
+    'merge-base --is-ancestor HEAD~1 "$remote"; then',
+    'rebase --onto "$remote" HEAD~1; then',
+    "rebase --abort",
+    'rev-list --count "$remote..HEAD"',
+    'if [ "$ahead" = 0 ]; then',
+    'diff --name-only "$remote" HEAD',
+    String.raw`if [ "$ahead" != 1 ] || [ -z "$changed" ] || printf '%s\n' "$changed" | grep -qv '^\.github/ISSUE_TEMPLATE/[^/]*$'; then`,
+  ];
+  const positions = order.map((s) => step.indexOf(s));
+  assert.ok(positions.every((p, i) => p > (positions[i - 1] ?? -1)), JSON.stringify(positions));
+  assert.doesNotMatch(step, /rebase refs\/remotes|rebase "\$remote"\n|reset --hard|gen-issue-forms/);
+}
+
 test("the four workflows exist", () => {
   for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
 });
@@ -157,8 +181,7 @@ test("publish forms: the generator runs in a step without the token; the push st
   assert.match(steps[generate], /git add -- \.github\/ISSUE_TEMPLATE\n[\s\S]*commit -m "chore\(forms\): regenerate issue forms"\n {10}echo "changed=true" >> "\$GITHUB_OUTPUT"/);
   assert.match(steps[generate], /echo "changed=false" >> "\$GITHUB_OUTPUT"\n {12}exit 0/);
   assert.match(steps[push], /\n {8}if: steps\.forms\.outputs\.changed == 'true'\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {8}run: \|\n/);
-  assert.match(steps[push], /for attempt in 1 2 3 4; do[\s\S]*fetch origin \+refs\/heads\/Source_Code:refs\/remotes\/origin\/Source_Code[\s\S]*rebase refs\/remotes\/origin\/Source_Code; then\n[\s\S]*rebase --abort[\s\S]*exit 1\n/);
-  assert.doesNotMatch(steps[push], /reset --hard|gen-issue-forms/);
+  assertFormsPushLoop(steps[push]);
 });
 
 test("_deploy-pages: reusable, builds Source_Code HEAD containing the expected commit, validates, stamps, deploys", () => {
