@@ -362,7 +362,7 @@ test("publish forms: the ---/+++ names of every file section must be its diff --
   assert.equal(staged.test(`M\t${T}/1-add-point.yml`), true);
 });
 
-test("publish forms: a binary section (a line ending in \" differ\" instead of a hunk) is refused by git's line count", { skip: HAS_AWK ? false : "awk is not installed" }, () => {
+test("publish forms: a binary section (\"Files ... differ\" instead of a hunk) is refused by git's line count; other lines fail to apply", { skip: HAS_AWK ? false : "awk is not installed" }, () => {
   const apply = stepsOf(jobsOf(workflows["publish.yml"]).find((j) => j.name === "forms").text)[1];
   // Each rule is taken from the workflow exactly as written; the patches are read from stdin.
   const rule = (re) => {
@@ -412,8 +412,9 @@ test("publish forms: a binary section (a line ending in \" differ\" instead of a
   assert.deepEqual(checks(changed), all, "changed form");
   assert.deepEqual(checks(added + changed), all, "two sections");
 
-  // git takes a line ending in " differ" where a hunk would start as a binary patch; with --index it would
-  // write the blob named on the index line (any blob in the repository). Only the line count refuses it.
+  // Where a hunk would start, git takes a line that begins with "Files " or "Binary files " and ends in
+  // " differ" as a binary patch; with --index it would write the blob named on the index line (any blob in
+  // the repository). The header check refuses "Binary files "; only the line count refuses "Files ".
   const binary = {
     changed: lines(`diff --git a/${X} b/${X}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${X}`, `+++ b/${X}`, "Files differ"),
     added: lines(`diff --git a/${X} b/${X}`, "new file mode 100644", `index ${sha("0")}..${sha("2")}`, "--- /dev/null", `+++ b/${X}`, "Files differ"),
@@ -422,6 +423,33 @@ test("publish forms: a binary section (a line ending in \" differ\" instead of a
     assert.ok(rows(gitApply("--numstat", patch)).includes(`-\t-\t${X}`), `${name}: git counts it as binary`);
     assert.deepEqual(checks(patch), { ...all, numstat: false }, name);
   }
+
+  // Any other line there is no binary patch: git counts the section as "0<TAB>0", so the four checks let it
+  // through, but git cannot parse it. apply --index, run right after the line count (bash -e, not inside an
+  // if), then fails with "patch with only garbage" before anything is written. apply --check parses the
+  // patch the same way and writes nothing.
+  const garbageToGit = (patch) => {
+    try {
+      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--check", "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+      return false;
+    } catch (error) {
+      return error.status === 128 && error.stderr.includes("patch with only garbage");
+    }
+  };
+  const header = [`diff --git a/${X} b/${X}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${X}`, `+++ b/${X}`];
+  const garbage = {
+    "Files differ with a CRLF line end": lines(...header, "Files differ\r"),
+    '" differ" without "Files "': lines(...header, " differ"),
+    '"x differ"': lines(...header, "x differ"),
+  };
+  for (const [name, patch] of Object.entries({ ...garbage, "after a text section": changed + garbage['" differ" without "Files "'] })) {
+    assert.equal(rows(gitApply("--numstat", patch)).at(-1), `0\t0\t${X}`, `${name}: git counts it as 0 lines`);
+    assert.deepEqual(checks(patch), all, name);
+    assert.equal(garbageToGit(patch), true, `${name}: git cannot parse it`);
+  }
+  for (const [name, patch] of [["changed form", changed], ["binary section", binary.changed]]) assert.equal(garbageToGit(patch), false, name);
+  assert.match(apply, /^ {10}git -c core\.hooksPath=\/dev\/null apply --index "\$patch_file"$/m, "a failed apply ends the step");
+  assert.doesNotMatch(workflows["publish.yml"], /^\s*shell:|set \+e/m);
 
   // The staged files are counted again after the patch is applied.
   assert.ok(numstatLine.test(`2\t0\t${X}`) && numstatLine.test(`1\t1\t${X}`));

@@ -197,8 +197,10 @@ jobs:
             exit 1
           fi
           # git's count per file is "<added><TAB><deleted><TAB><path>". A binary section counts as
-          # "-<TAB>-<TAB><path>": git takes any line ending in " differ" where a hunk would start as a binary
-          # patch, and applies it with --index as the blob named on its index line (any blob in the repository).
+          # "-<TAB>-<TAB><path>": where a hunk would start, git takes a line that begins with "Files " or
+          # "Binary files " and ends in " differ" as a binary patch, and applies it with --index as the blob
+          # named on its index line (any blob in the repository). Any other line there counts as "0<TAB>0",
+          # and git apply --index below then fails on it ("patch with only garbage").
           numstat="$(git -c core.hooksPath=/dev/null apply --numstat "$patch_file")"
           if [ -z "$numstat" ] || printf '%s\n' "$numstat" | grep -Eqvx "[0-9]+$tab[0-9]+$tab$allowed"; then
             echo "::error::The Issue Forms patch changes more than the text of .yml files in .github/ISSUE_TEMPLATE/"
