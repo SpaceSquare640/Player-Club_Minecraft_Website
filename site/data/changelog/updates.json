@@ -24,6 +24,18 @@
         "en": "World switcher, World info",
         "zh-TW": "世界切換、世界資訊"
       }
+    },
+    {
+      "id": "u0003",
+      "date": "2026-09-30",
+      "summary": {
+        "en": "Coordinate requests: an issue is closed only after the website update has finished; if publishing is cancelled or fails, it stays open until the next run",
+        "zh-TW": "座標請求：網站更新完成後才關閉 Issue；發布取消或失敗時保留至下次執行"
+      },
+      "scope": {
+        "en": "Coordinate requests",
+        "zh-TW": "座標請求"
+      }
     }
   ]
 }
