@@ -196,18 +196,24 @@ jobs:
             echo "::error::The Issue Forms patch does more than change or add .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi
-          paths="$(git -c core.hooksPath=/dev/null apply --numstat "$patch_file" | cut -f3)"
-          if [ -z "$paths" ] || printf '%s\n' "$paths" | grep -Eqvx "$allowed"; then
-            echo "::error::The Issue Forms patch changes more than .yml files in .github/ISSUE_TEMPLATE/"
+          # git's count per file is "<added><TAB><deleted><TAB><path>". A binary section counts as
+          # "-<TAB>-<TAB><path>": git takes any line ending in " differ" where a hunk would start as a binary
+          # patch, and applies it with --index as the blob named on its index line (any blob in the repository).
+          numstat="$(git -c core.hooksPath=/dev/null apply --numstat "$patch_file")"
+          if [ -z "$numstat" ] || printf '%s\n' "$numstat" | grep -Eqvx "[0-9]+$tab[0-9]+$tab$allowed"; then
+            echo "::error::The Issue Forms patch changes more than the text of .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi
           git -c core.hooksPath=/dev/null checkout -q --detach "$FORMS_BASE"
           git -c core.hooksPath=/dev/null apply --index "$patch_file"
-          # Without rename detection a moved file shows up as a deletion (D), which is refused.
+          # Without rename detection a moved file shows up as a deletion (D), which is refused. A staged file
+          # that git counts as binary ("-<TAB>-") is refused too.
           staged="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --name-status)"
           modes="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --no-abbrev --raw)"
+          counts="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --numstat)"
           if [ -z "$staged" ] || printf '%s\n' "$staged" | grep -Eqvx "[AM]$tab$allowed" \
-            || printf '%s\n' "$modes" | grep -Eqvx ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed"; then
+            || printf '%s\n' "$modes" | grep -Eqvx ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed" \
+            || printf '%s\n' "$counts" | grep -Eqvx "[0-9]+$tab[0-9]+$tab$allowed"; then
             echo "::error::The staged changes are not limited to regular .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi

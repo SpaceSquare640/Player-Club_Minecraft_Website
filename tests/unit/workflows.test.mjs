@@ -85,6 +85,8 @@ const PATCH_DENY = String.raw`^(rename|copy) (from|to|old|new) |^(old|new) mode 
 const SUMMARY_ALLOWED = " create mode 100644 $allowed";
 const STAGED_ALLOWED = "[AM]$tab$allowed";
 const RAW_ALLOWED = ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed";
+/** git's line count per file (apply --numstat, diff --numstat); a binary file counts as "-<TAB>-". */
+const NUMSTAT_ALLOWED = "[0-9]+$tab[0-9]+$tab$allowed";
 
 test("the four workflows exist", () => {
   for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
@@ -274,14 +276,16 @@ test("publish forms: generated in a read-only job without a token, handed over a
     'echo "::error::A file in the Issue Forms patch is read and written under different names"',
     'summary="$(git -c core.hooksPath=/dev/null apply --summary "$patch_file")"',
     `if [ -n "$summary" ] && printf '%s\\n' "$summary" | grep -Eqvx -e "${SUMMARY_ALLOWED}"; then`,
-    'apply --numstat "$patch_file" | cut -f3)"',
-    'if [ -z "$paths" ] || printf \'%s\\n\' "$paths" | grep -Eqvx "$allowed"; then',
+    'numstat="$(git -c core.hooksPath=/dev/null apply --numstat "$patch_file")"',
+    `if [ -z "$numstat" ] || printf '%s\\n' "$numstat" | grep -Eqvx "${NUMSTAT_ALLOWED}"; then`,
     'checkout -q --detach "$FORMS_BASE"',
     'apply --index "$patch_file"',
     'staged="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --name-status)"',
     'modes="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --no-abbrev --raw)"',
+    'counts="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --numstat)"',
     `if [ -z "$staged" ] || printf '%s\\n' "$staged" | grep -Eqvx "${STAGED_ALLOWED}" \\`,
-    `|| printf '%s\\n' "$modes" | grep -Eqvx "${RAW_ALLOWED}"; then`,
+    `|| printf '%s\\n' "$modes" | grep -Eqvx "${RAW_ALLOWED}" \\`,
+    `|| printf '%s\\n' "$counts" | grep -Eqvx "${NUMSTAT_ALLOWED}"; then`,
     'commit -q -m "chore(forms): regenerate issue forms"',
   ].map((s) => apply.indexOf(s));
   assert.ok(applied.every((p, i) => p > (applied[i - 1] ?? -1)), JSON.stringify(applied));
@@ -341,6 +345,74 @@ test("publish forms: the ---/+++ names of every file section must be its diff --
   const staged = new RegExp(`^(?:${STAGED_ALLOWED.replace("$tab", "\t").replace("$allowed", /^allowed='([^']+)'$/.exec(ALLOWED_LINE)[1])})$`);
   assert.equal(staged.test(`D\t${T}/config.yml`), false);
   assert.equal(staged.test(`M\t${T}/1-add-point.yml`), true);
+});
+
+test("publish forms: a binary section (a line ending in \" differ\" instead of a hunk) is refused by git's line count", { skip: HAS_AWK ? false : "awk is not installed" }, () => {
+  const apply = stepsOf(jobsOf(workflows["publish.yml"]).find((j) => j.name === "forms").text)[1];
+  // Each rule is taken from the workflow exactly as written; the patches are read from stdin.
+  const rule = (re) => {
+    const m = re.exec(apply);
+    assert.ok(m, String(re));
+    return m[1];
+  };
+  const allowed = rule(/^\s*allowed='([^']+)'$/m);
+  const whole = (pattern) => new RegExp(`^(?:${pattern.replaceAll("$allowed", allowed).replaceAll("$tab", "\t")})$`);
+  const deny = new RegExp(rule(/if grep -Eq '([^']+)' "\$patch_file"/), "m");
+  const program = rule(/if ! awk '([\s\S]*?)' "\$patch_file"; then/);
+  const summaryLine = whole(rule(/printf '%s\\n' "\$summary" \| grep -Eqvx -e "([^"]+)"; then/));
+  const numstatRule = rule(/printf '%s\\n' "\$numstat" \| grep -Eqvx "([^"]+)"; then/);
+  const countsRule = rule(/printf '%s\\n' "\$counts" \| grep -Eqvx "([^"]+)"; then/);
+  assert.equal(numstatRule, NUMSTAT_ALLOWED);
+  assert.equal(countsRule, NUMSTAT_ALLOWED);
+  const numstatLine = whole(numstatRule);
+  const gitApply = (option, patch) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", option, "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8" });
+  const rows = (text) => text.split("\n").filter(Boolean);
+  const awkAccepts = (patch) => {
+    try {
+      execFileSync("awk", [program], { input: patch, stdio: ["pipe", "ignore", "ignore"] });
+      return true;
+    } catch (error) {
+      if (error.status === 1) return false;
+      throw error;
+    }
+  };
+  // The four checks before the patch is applied, as the workflow runs them.
+  const checks = (patch) => {
+    const numstat = rows(gitApply("--numstat", patch));
+    return {
+      deny: !deny.test(patch),
+      names: awkAccepts(patch),
+      summary: rows(gitApply("--summary", patch)).every((line) => summaryLine.test(line)),
+      numstat: numstat.length > 0 && numstat.every((line) => numstatLine.test(line)),
+    };
+  };
+
+  const X = ".github/ISSUE_TEMPLATE/x.yml";
+  const sha = (c) => c.repeat(40);
+  const lines = (...list) => `${list.join("\n")}\n`;
+  const added = lines(`diff --git a/${X} b/${X}`, "new file mode 100644", `index ${sha("0")}..${sha("1")}`, "--- /dev/null", `+++ b/${X}`, "@@ -0,0 +1,2 @@", "+name: x", "+description: y");
+  const changed = lines(`diff --git a/${X} b/${X}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${X}`, `+++ b/${X}`, "@@ -1,2 +1,2 @@", " name: x", "-description: y", "+description: z");
+  const all = { deny: true, names: true, summary: true, numstat: true };
+  assert.deepEqual(checks(added), all, "added form");
+  assert.deepEqual(checks(changed), all, "changed form");
+  assert.deepEqual(checks(added + changed), all, "two sections");
+
+  // git takes a line ending in " differ" where a hunk would start as a binary patch; with --index it would
+  // write the blob named on the index line (any blob in the repository). Only the line count refuses it.
+  const binary = {
+    changed: lines(`diff --git a/${X} b/${X}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${X}`, `+++ b/${X}`, "Files differ"),
+    added: lines(`diff --git a/${X} b/${X}`, "new file mode 100644", `index ${sha("0")}..${sha("2")}`, "--- /dev/null", `+++ b/${X}`, "Files differ"),
+  };
+  for (const [name, patch] of Object.entries({ ...binary, "after a text section": changed + binary.changed })) {
+    assert.ok(rows(gitApply("--numstat", patch)).includes(`-\t-\t${X}`), `${name}: git counts it as binary`);
+    assert.deepEqual(checks(patch), { ...all, numstat: false }, name);
+  }
+
+  // The staged files are counted again after the patch is applied.
+  assert.ok(numstatLine.test(`2\t0\t${X}`) && numstatLine.test(`1\t1\t${X}`));
+  for (const line of [`-\t-\t${X}`, `1\t1\tsite/data/config.json`, "1\t1\t.github/ISSUE_TEMPLATE/sub/x.yml", `1\t1\t${X}\textra`]) {
+    assert.equal(numstatLine.test(line), false, line);
+  }
 });
 
 test("publish forms: the patch checks refuse renames (rename old/new too), copies, deletions, mode changes and links", () => {
