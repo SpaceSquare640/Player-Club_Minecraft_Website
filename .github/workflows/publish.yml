@@ -158,6 +158,37 @@ jobs:
             echo "::error::The Issue Forms patch changes more than .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi
+          # In every file section the "---" and "+++" names must be the a/ and b/ names of its "diff --git"
+          # line ("---" is /dev/null for an added file, and only then), both before the first hunk; otherwise
+          # git reads the file under one name and writes it under another without reporting a rename.
+          if ! awk '
+            /^diff --git / {
+              if (section && !names) bad = 1
+              section = 1; names = 0; hunk = 0; added = 0; old = ""
+              if (NF != 4 || substr($3, 1, 2) != "a/" || substr($4, 1, 2) != "b/") bad = 1
+              a = substr($3, 3); b = substr($4, 3)
+              next
+            }
+            hunk { next }
+            /^@@ / { if (!names) bad = 1; hunk = 1; next }
+            /^new file mode / { added = 1; next }
+            /^--- / {
+              if (!section || old != "") bad = 1
+              old = substr($0, 5)
+              if (!((old == "a/" a && !added) || (old == "/dev/null" && added))) bad = 1
+              next
+            }
+            /^\+\+\+ / {
+              if (!section || old == "" || names) bad = 1
+              if (substr($0, 5) != "b/" b) bad = 1
+              names = 1
+              next
+            }
+            END { if (!section || !names) bad = 1; exit bad }
+          ' "$patch_file"; then
+            echo "::error::A file in the Issue Forms patch is read and written under different names"
+            exit 1
+          fi
           # git's own reading of the patch: a changed file prints no summary line and an added one prints
           # " create mode 100644 <path>"; a rename, copy, deletion or mode change prints a line of its own.
           summary="$(git -c core.hooksPath=/dev/null apply --summary "$patch_file")"

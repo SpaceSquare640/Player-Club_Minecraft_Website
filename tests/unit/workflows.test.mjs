@@ -269,6 +269,9 @@ test("publish forms: generated in a read-only job without a token, handed over a
     "grep -qvx 'new file mode 100644'",
     'grep -Eqvx "diff --git a/($allowed) b/\\\\1"',
     'grep -Eqvx -e "--- a/$allowed|\\+\\+\\+ b/$allowed|--- /dev/null"; then',
+    "if ! awk '\n",
+    `' "$patch_file"; then\n`,
+    'echo "::error::A file in the Issue Forms patch is read and written under different names"',
     'summary="$(git -c core.hooksPath=/dev/null apply --summary "$patch_file")"',
     `if [ -n "$summary" ] && printf '%s\\n' "$summary" | grep -Eqvx -e "${SUMMARY_ALLOWED}"; then`,
     'apply --numstat "$patch_file" | cut -f3)"',
@@ -285,6 +288,59 @@ test("publish forms: generated in a read-only job without a token, handed over a
   assert.doesNotMatch(apply, /git (am|apply --3way|apply --unsafe-paths)|--name-only/);
   assert.match(push, /^name: Push the Issue Forms\n {8}id: push\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n/);
   assertFormsPushLoop(push);
+});
+
+const HAS_AWK = (() => {
+  try {
+    execFileSync("awk", ["BEGIN { exit 0 }"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+test("publish forms: the ---/+++ names of every file section must be its diff --git names", { skip: HAS_AWK ? false : "awk is not installed" }, () => {
+  const apply = stepsOf(jobsOf(workflows["publish.yml"]).find((j) => j.name === "forms").text)[1];
+  const program = /if ! awk '([\s\S]*?)' "\$patch_file"; then/.exec(apply)[1];
+  // awk reads each patch from stdin, running the program exactly as written in the workflow.
+  const namesMatch = (patch) => {
+    try {
+      execFileSync("awk", [program], { input: patch, stdio: ["pipe", "ignore", "ignore"] });
+      return true;
+    } catch (error) {
+      if (error.status === 1) return false;
+      throw error;
+    }
+  };
+  const T = ".github/ISSUE_TEMPLATE";
+  const lines = (...rows) => `${rows.join("\n")}\n`;
+  const added = lines(`diff --git a/${T}/x.yml b/${T}/x.yml`, "new file mode 100644", "index 0000000..1111111", "--- /dev/null", `+++ b/${T}/x.yml`, "@@ -0,0 +1,2 @@", "+name: x", "+--- content, not a header");
+  const changed = lines(`diff --git a/${T}/x.yml b/${T}/x.yml`, "index 1111111..2222222 100644", `--- a/${T}/x.yml`, `+++ b/${T}/x.yml`, "@@ -1,2 +1 @@", "--- content", "+++ content");
+  assert.equal(namesMatch(added), true, "added");
+  assert.equal(namesMatch(changed), true, "changed");
+  assert.equal(namesMatch(added + changed), true, "two sections");
+
+  // Read as config.yml, written as 1-add-point.yml: git reports no rename for it, so the header check and
+  // git apply --summary let it through; this rule refuses it before anything is applied.
+  const moved = lines(`diff --git a/${T}/config.yml b/${T}/config.yml`, "index 1111111..2222222 100644", `--- a/${T}/config.yml`, `+++ b/${T}/1-add-point.yml`, "@@ -1 +1 @@", "-a", "+b");
+  assert.equal(new RegExp(PATCH_DENY, "m").test(moved), false, "the header deny list does not see it");
+  const summary = execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--summary", "-"], { cwd: REPO_ROOT, input: moved, encoding: "utf8" });
+  assert.equal(summary, "", "git apply --summary does not see it");
+  assert.equal(namesMatch(moved), false, "refused before it is applied");
+  const refused = {
+    "--- names another form": lines(`diff --git a/${T}/x.yml b/${T}/x.yml`, "index 1..2 100644", `--- a/${T}/config.yml`, `+++ b/${T}/x.yml`, "@@ -1 +1 @@", "-a", "+b"),
+    "/dev/null for a file that is not added": lines(`diff --git a/${T}/x.yml b/${T}/x.yml`, "index 0..1", "--- /dev/null", `+++ b/${T}/x.yml`, "@@ -0,0 +1 @@", "+a"),
+    "an added file read from a/": lines(`diff --git a/${T}/x.yml b/${T}/x.yml`, "new file mode 100644", `--- a/${T}/x.yml`, `+++ b/${T}/x.yml`, "@@ -0,0 +1 @@", "+a"),
+    "no ---/+++ before the hunk": lines(`diff --git a/${T}/x.yml b/${T}/x.yml`, "index 1..2 100644", "@@ -1 +1 @@", "-a", "+b"),
+    "no diff --git line": lines(`--- a/${T}/x.yml`, `+++ b/${T}/x.yml`, "@@ -1 +1 @@", "-a", "+b"),
+    "a second section that moves": added + moved,
+  };
+  for (const [name, patch] of Object.entries(refused)) assert.equal(namesMatch(patch), false, name);
+
+  // Applied anyway, it would be staged as a deletion plus a change, and the staged check refuses the deletion.
+  const staged = new RegExp(`^(?:${STAGED_ALLOWED.replace("$tab", "\t").replace("$allowed", /^allowed='([^']+)'$/.exec(ALLOWED_LINE)[1])})$`);
+  assert.equal(staged.test(`D\t${T}/config.yml`), false);
+  assert.equal(staged.test(`M\t${T}/1-add-point.yml`), true);
 });
 
 test("publish forms: the patch checks refuse renames (rename old/new too), copies, deletions, mode changes and links", () => {
