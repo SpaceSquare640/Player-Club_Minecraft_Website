@@ -4,8 +4,8 @@
 //
 // run (job apply, architecture 3.15): scan open Issues labeled coord-request + approved in approval order.
 //   1. The last account that added "approved" must be in config.approvers (case-insensitive).
-//   2. A "Request-Issue: #<n>" trailer in a bot commit of the history (author and committer both
-//      github-actions[bot]; see lib/git.mjs) or a change log entry of the Issue means the request was
+//   2. A "Request-Issue: #<n>" trailer in a bot commit of the first-parent history (author and committer
+//      both github-actions[bot]; see lib/git.mjs) or a change log entry of the Issue means the request was
 //      written earlier: it only waits for deployment and closing.
 //   3. The bot report must have status=pass, the approval must be strictly later than the report was last
 //      written, and its snapshot hash must equal the hash recomputed from the current body and data in

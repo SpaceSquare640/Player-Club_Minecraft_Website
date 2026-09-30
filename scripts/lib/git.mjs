@@ -86,7 +86,7 @@ export function requestLogFormat(sep) {
  * commit is ignored, including pull request commits that GitHub squashes or rebases on merge (GitHub
  * becomes the committer). A record that does not split into exactly five fields is ignored.
  * Git identities are not authenticated, so a commit whose author and committer were both set to the bot by
- * hand still counts here.
+ * hand would still count here; requestIssueNumbers therefore reads the first-parent history only.
  */
 export function parseRequestLog(out, sep) {
   if (!SEPARATOR_RE.test(sep)) throw new TypeError("Invalid log separator");
@@ -105,10 +105,16 @@ export function parseRequestLog(out, sep) {
   return numbers;
 }
 
-/** Issue numbers named by "Request-Issue: #<n>" trailers of bot commits in the history of HEAD. */
+/**
+ * Issue numbers named by "Request-Issue: #<n>" trailers of bot commits in the first-parent history of HEAD.
+ * The bot pushes its commits straight onto Source_Code, so they are on that chain; commits brought in by a
+ * merge commit (for example a pull request with a hand-made bot identity) are not. When a bot commit is
+ * off the chain (the owner merged Source_Code into a local branch and pushed the merge), apply-requests
+ * still recognizes the request by the change log entry that every applied request writes.
+ */
 export async function requestIssueNumbers(root, run = git, separator = newLogSeparator) {
   const sep = separator();
-  return parseRequestLog(await run(["log", `--format=${requestLogFormat(sep)}`, "HEAD"], { cwd: root }), sep);
+  return parseRequestLog(await run(["log", "--first-parent", `--format=${requestLogFormat(sep)}`, "HEAD"], { cwd: root }), sep);
 }
 
 /** Current HEAD commit SHA. */

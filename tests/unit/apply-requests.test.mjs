@@ -526,7 +526,7 @@ test("Request-Issue trailers count only in commits authored and committed by the
   assert.throws(() => requestLogFormat("\x1e"), TypeError);
   assert.equal(requestLogFormat(sep), `${sep}R%an${sep}F%ae${sep}F%cn${sep}F%ce${sep}F%(trailers:key=Request-Issue,valueonly)`);
 
-  // requestIssueNumbers asks git for exactly this format over the history of HEAD.
+  // requestIssueNumbers asks git for exactly this format over the first-parent history of HEAD.
   const calls = [];
   const numbers = await requestIssueNumbers(
     ROOT,
@@ -537,18 +537,51 @@ test("Request-Issue trailers count only in commits authored and committed by the
     () => sep,
   );
   assert.deepEqual(sorted(numbers), [3, 4, 11]);
-  assert.deepEqual(calls, [[["log", `--format=${requestLogFormat(sep)}`, "HEAD"], { cwd: ROOT }]]);
+  assert.deepEqual(calls, [[["log", "--first-parent", `--format=${requestLogFormat(sep)}`, "HEAD"], { cwd: ROOT }]]);
 
   // Every call uses a fresh random separator.
   const separators = [];
   for (let i = 0; i < 2; i += 1) {
     await requestIssueNumbers(ROOT, async (args) => {
-      separators.push(/^--format=([0-9a-f]{32})R%an/.exec(args[1])[1]);
+      separators.push(/^--format=([0-9a-f]{32})R%an/.exec(args[2])[1]);
       return "";
     });
   }
   assert.equal(separators.length, 2);
   assert.notEqual(separators[0], separators[1]);
+});
+
+test("run: a request whose bot commit left the first-parent history is still recognized by its change log entry", async () => {
+  // For example the owner pulled with a merge and pushed it: the bot commit is then the second parent of the
+  // merge and requestIssueNumbers (first-parent history) no longer sees its trailer. Every applied request
+  // writes a change log entry with the Issue as its source, so the request is not written a second time.
+  const cases = [
+    ["add", ADD_VALUES],
+    ["edit", EDIT({ name: "Village One" })],
+    ["delete", { target_id: "p0002" }],
+    ["spawn", { target_id: "spawn:player_club", x: "8", y: "100", z: "5" }],
+  ];
+  for (const [kind, values] of cases) {
+    const dataset = createDataset();
+    const first = await runApply({ dataset, entries: [approvedEntry(dataset, kind, values, { number: 12 })] });
+    assert.equal(first.repo.state.pushed.length, 1, kind);
+    first.repo.git.requestIssueNumbers = async () => new Set();
+    const again = await run({
+      github: first.gh.github,
+      context: { repo: REPO },
+      core: { info: () => {}, setOutput: () => {} },
+      root: ROOT,
+      reader: first.repo.reader,
+      io: first.repo.io,
+      git: first.repo.git,
+      now: () => new Date(NOW),
+    });
+    assert.equal(again.commits, 0, kind);
+    assert.equal(first.repo.state.pushed.length, 1, kind);
+    assert.equal(again.results[0].status, "already-applied", kind);
+    assert.equal(again.results[0].kind, kind);
+    assert.equal(again.needsDeploy, true, `${kind}: deployed and closed by the report`);
+  }
 });
 
 test("a non-bot commit cannot forge a bot record through control characters or a guessed separator", () => {
