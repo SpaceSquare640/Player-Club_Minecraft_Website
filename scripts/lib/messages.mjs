@@ -429,6 +429,19 @@ export function renderAppliedComment({ url, pointId = null }) {
   return lines.join("\n");
 }
 
+/**
+ * Last line of the deploy status comment (publishing failed or cancelled). Each Issue has at most one: later
+ * runs update it in place instead of adding another comment.
+ */
+export const DEPLOY_STATUS_MARKER = "<!-- pcmw:deploy-status -->";
+
+/** True for a body that starts with RESULT_MARKER and ends with DEPLOY_STATUS_MARKER. */
+export function isDeployStatusBody(body) {
+  if (typeof body !== "string") return false;
+  const lines = body.replace(/\r\n?/g, "\n").split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines[0] === RESULT_MARKER && lines.at(-1) === DEPLOY_STATUS_MARKER;
+}
+
 /** Written, but the deployment failed; the next run deploys again and closes the Issue. */
 export function renderDeployFailedComment() {
   return [
@@ -437,6 +450,7 @@ export function renderDeployFailedComment() {
     "",
     `The request was written to the data, but publishing the site failed. The ${code(LABELS.approved)} label is kept; the next scheduled run (daily) or a manual run publishes the site again and closes this issue.`,
     `請求已寫入資料，但網站發布失敗。${code(LABELS.approved)} 標籤保留，下次排程（每日）或手動執行時會重新發布並關閉此 Issue。`,
+    DEPLOY_STATUS_MARKER,
   ].join("\n");
 }
 
@@ -448,5 +462,6 @@ export function renderDeployCancelledComment() {
     "",
     `The request was written to the data, but publishing the site was cancelled before it finished (for example, a newer publishing run replaced it). The ${code(LABELS.approved)} label is kept; the next scheduled run (daily) or a manual run publishes the site again and closes this issue.`,
     `請求已寫入資料，但網站發布在完成前已取消（例如被較新的發布取代）。${code(LABELS.approved)} 標籤保留，下次排程（每日）或手動執行時會重新發布並關閉此 Issue。`,
+    DEPLOY_STATUS_MARKER,
   ].join("\n");
 }

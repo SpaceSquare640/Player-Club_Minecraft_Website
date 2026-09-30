@@ -1,7 +1,7 @@
 // GitHub REST helpers over the Octokit client injected by actions/github-script (github.rest.*,
 // github.paginate). Tests and --dry-run pass a stand-in with the same shape.
 
-import { findReportComment } from "./snapshot.mjs";
+import { findReportComment, isTrustedBotComment } from "./snapshot.mjs";
 
 /** { owner, repo } from github-script's context, else from GITHUB_REPOSITORY. */
 export function repoOf(context, env = process.env) {
@@ -50,6 +50,23 @@ export async function listIssueComments(github, repo, issueNumber) {
  */
 export async function upsertReportComment(github, repo, issueNumber, body) {
   const existing = findReportComment(await listIssueComments(github, repo, issueNumber));
+  if (existing) {
+    await github.rest.issues.updateComment({ ...repo, comment_id: existing.id, body });
+    return { action: "updated", id: existing.id };
+  }
+  const { data } = await github.rest.issues.createComment({ ...repo, issue_number: issueNumber, body });
+  return { action: "created", id: data?.id };
+}
+
+/**
+ * Creates or updates one comment of a kind: the latest comment by github-actions[bot] whose body matches
+ * is updated, otherwise a new one is created. Comments by anyone else are never touched.
+ * @param {(body: string) => boolean} matches
+ * @returns {Promise<{ action: "created" | "updated", id: number }>}
+ */
+export async function upsertBotComment(github, repo, issueNumber, body, matches) {
+  const comments = await listIssueComments(github, repo, issueNumber);
+  const existing = comments.filter((c) => isTrustedBotComment(c) && typeof c.body === "string" && matches(c.body)).at(-1);
   if (existing) {
     await github.rest.issues.updateComment({ ...repo, comment_id: existing.id, body });
     return { action: "updated", id: existing.id };

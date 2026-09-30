@@ -18,7 +18,8 @@
 // report (job report): after the deployment, applied Issues get a comment with the site link, the applied
 //   label and are closed, but only when the deployment succeeded. A cancelled deployment (replaced by a
 //   newer one, or the run was cancelled) only gets a comment; a failed one also gets deploy-failed. Both
-//   keep approved and stay open, so the next scan deploys again and closes them.
+//   keep approved and stay open, so the next scan deploys again and closes them. That comment is one per
+//   Issue (the deploy status comment), updated in place by later runs.
 // Local: node scripts/apply-requests.mjs --event <event.json> --dry-run   (prints what would be written)
 
 import { readFile, writeFile } from "node:fs/promises";
@@ -42,11 +43,13 @@ import {
   listOpenIssuesWithLabels,
   removeLabel,
   repoOf,
+  upsertBotComment,
 } from "./lib/github.mjs";
 import { evaluateRequest } from "./lib/issue-parse.mjs";
 import { stringifyJson } from "./lib/json-io.mjs";
 import { CORE_FILES, REPO_ROOT, createFsReader, loadDataset, pathOf, pointsPath } from "./lib/load-data.mjs";
 import {
+  isDeployStatusBody,
   problemText,
   renderAppliedComment,
   renderDeployCancelledComment,
@@ -456,10 +459,10 @@ export async function report({ github, context, core, env = process.env, root = 
           await removeLabel(github, repo, r.issue, LABELS.deployFailed);
           await closeIssue(github, repo, r.issue);
         } else if (cancelled) {
-          await createComment(github, repo, r.issue, renderDeployCancelledComment());
+          await upsertBotComment(github, repo, r.issue, renderDeployCancelledComment(), isDeployStatusBody);
         } else {
           await addLabels(github, repo, r.issue, [LABELS.deployFailed]);
-          await createComment(github, repo, r.issue, renderDeployFailedComment());
+          await upsertBotComment(github, repo, r.issue, renderDeployFailedComment(), isDeployStatusBody);
         }
         log(`Issue #${r.issue}: ${deployed ? "closed as applied" : cancelled ? "left open (deployment cancelled)" : "marked deploy-failed"}`);
       } catch (error) {

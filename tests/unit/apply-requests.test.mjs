@@ -24,7 +24,7 @@ import { BOT_IDENTITY, parseRequestLog, requestIssueNumbers, requestLogFormat } 
 import { evaluateRequest } from "../../scripts/lib/issue-parse.mjs";
 import { stringifyJson } from "../../scripts/lib/json-io.mjs";
 import { I18N_DIR, POINTS_DIR, listDataFiles, loadDataset } from "../../scripts/lib/load-data.mjs";
-import { RESULT_MARKER } from "../../scripts/lib/messages.mjs";
+import { DEPLOY_STATUS_MARKER, RESULT_MARKER, isDeployStatusBody } from "../../scripts/lib/messages.mjs";
 import { findInternalText } from "../../scripts/lib/public-text-guard.mjs";
 import { REPORT_MARKER, formatSnapshotMarker, parseSnapshotMarker, snapshotHash } from "../../scripts/lib/snapshot.mjs";
 import { validateDataset } from "../../scripts/validate.mjs";
@@ -686,9 +686,8 @@ test("siteLink points at the point (not for deletions) and names the world only 
   assert.equal(siteLink(config, { kind: "spawn", pointId: null, worldId: "player_club" }), config.siteUrl);
 });
 
-async function runReport(deployResult, results, { entries } = {}) {
-  const dataset = createDataset();
-  const gh = fakeGithub(entries ?? results.map((r) => approvedEntry(dataset, "add", ADD_VALUES, { number: r.issue })));
+async function runReport(deployResult, results, { entries, gh: existing, dataset = createDataset() } = {}) {
+  const gh = existing ?? fakeGithub(entries ?? results.map((r) => approvedEntry(dataset, "add", ADD_VALUES, { number: r.issue })));
   const infos = [];
   const outcome = await report({
     github: gh.github,
@@ -739,6 +738,29 @@ test("report: a cancelled deployment is not treated as published; the Issue stay
     assert.ok(!lines.join("\n").includes("https://"), "no site link: the change is not confirmed to be published");
   }
   assert.ok(infos.includes("Issue #12: left open (deployment cancelled)"));
+});
+
+test("report: the failed or cancelled notice is one comment per Issue, updated in place by later runs", async () => {
+  const dataset = createDataset();
+  const entry = approvedEntry(dataset, "add", ADD_VALUES, { number: 12 });
+  const withdrawn = { id: 2, user: BOT, body: `${RESULT_MARKER}\n### Approval withdrawn / 核准已撤回\n\nearlier notice`, created_at: REPORT_AT, updated_at: REPORT_AT };
+  const forged = { id: 3, user: { login: "friend-01", type: "User" }, body: `${RESULT_MARKER}\n### Publishing failed / 發布失敗\n${DEPLOY_STATUS_MARKER}`, created_at: REPORT_AT, updated_at: REPORT_AT };
+  entry.comments.push(withdrawn, forged);
+  const gh = fakeGithub([entry]);
+  const results = [{ issue: 12, status: "already-applied" }];
+  for (const result of ["failure", "cancelled", "failure", "cancelled"]) await runReport(result, results, { gh, dataset });
+
+  const comments = gh.get(12).comments;
+  const notices = comments.filter((c) => c.user === BOT && isDeployStatusBody(c.body));
+  assert.equal(notices.length, 1, "one deploy status comment");
+  assert.ok(notices[0].body.startsWith(`${RESULT_MARKER}\n### Publishing cancelled / 發布已取消\n`), "it shows the latest result");
+  assert.equal(comments.find((c) => c.id === 2).body, withdrawn.body, "other result comments are kept");
+  assert.equal(comments.find((c) => c.id === 3).body, forged.body, "comments by anyone else are never touched");
+  assert.deepEqual(
+    gh.mutations().filter(([name]) => name === "createComment" || name === "updateComment"),
+    [["createComment", 12], ["updateComment", 12], ["updateComment", 12], ["updateComment", 12]],
+  );
+  assert.equal(gh.get(12).state, "open");
 });
 
 test("report: a failed (or unknown) deployment adds deploy-failed, keeps approved and leaves the Issue open", async () => {
