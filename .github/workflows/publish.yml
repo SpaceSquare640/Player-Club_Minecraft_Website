@@ -1,10 +1,12 @@
 # Checks and publishes pushes to Source_Code.
 # check: validation (X18 compares with the commit before the push) and unit tests; nothing is deployed
 # when it fails, so the site keeps the previous version.
-# forms-check / forms: read-only check of the generated Issue Forms; only when they are out of date does
-# the forms job regenerate them and push a commit. It has its own issue-forms-writer queue: sharing one
-# with apply-approved would let a pending forms job replace (cancel) a pending apply job. A push that
-# races with another writer is rejected and retried (see the step comment).
+# forms-check / forms: the Issue Forms are generated in forms-check (contents: read, no token), which
+# hands the changes to forms as a git patch in a job output. forms (contents: write) runs no Node.js and
+# no npm: it checks that the patch only changes .yml files directly in .github/ISSUE_TEMPLATE/, commits it
+# on the commit it was made from and pushes. It has its own issue-forms-writer queue: sharing one with
+# apply-approved would let a pending forms job replace (cancel) a pending apply job. A push that races
+# with another writer is rejected and retried (see the step comment).
 # deploy: the reusable Pages deployment (always the current Source_Code HEAD).
 # Commits pushed with GITHUB_TOKEN (the bot) do not trigger this workflow.
 name: Publish
@@ -58,6 +60,8 @@ jobs:
       contents: read
     outputs:
       stale: ${{ steps.forms.outputs.stale }}
+      base: ${{ steps.forms.outputs.base }}
+      patch: ${{ steps.forms.outputs.patch }}
     steps:
       - name: Check out Source_Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -74,14 +78,29 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Compare the Issue Forms with the data
+      # The patch is a job output (base64 of a git diff, a few kB): no extra action is needed, and the size
+      # is kept well below the job output and environment variable limits.
+      - name: Compare the Issue Forms with the data and prepare a patch
         id: forms
         run: |
           if node scripts/gen-issue-forms.mjs --check; then
             echo "stale=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "stale=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          node scripts/gen-issue-forms.mjs
+          git add -- .github/ISSUE_TEMPLATE
+          patch="$(git diff --cached --full-index -- .github/ISSUE_TEMPLATE | base64 -w0)"
+          if [ -z "$patch" ]; then
+            echo "::error::The Issue Forms are out of date, but regenerating them changed nothing"
+            exit 1
+          fi
+          if [ "${#patch}" -gt 100000 ]; then
+            echo "::error::The Issue Forms patch is too large for a job output"
+            exit 1
+          fi
+          echo "stale=true" >> "$GITHUB_OUTPUT"
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "patch=$patch" >> "$GITHUB_OUTPUT"
 
   forms:
     needs: forms-check
@@ -101,29 +120,48 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      # No token in this step: the generator and the packages it loads never see it.
-      - name: Regenerate and commit the Issue Forms
-        id: forms
+      # This job runs git and shell only (no Node.js, no npm), and this step has no token. Every file in
+      # the patch must be a .yml file directly in .github/ISSUE_TEMPLATE/, changed or added as a regular
+      # file (no rename, copy, deletion, mode change, symbolic link or binary data); the paths are checked
+      # in the patch before it is applied and in the index after. The patch is applied to the commit it was
+      # made from; the commit message and identity are fixed here, never taken from the patch.
+      - name: Check and commit the Issue Forms patch
+        env:
+          FORMS_BASE: ${{ needs.forms-check.outputs.base }}
+          FORMS_PATCH: ${{ needs.forms-check.outputs.patch }}
         run: |
-          node scripts/gen-issue-forms.mjs
-          if [ -z "$(git status --porcelain -- .github/ISSUE_TEMPLATE)" ]; then
-            echo "The Issue Forms are up to date"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          allowed='\.github/ISSUE_TEMPLATE/[A-Za-z0-9_-][A-Za-z0-9._-]*\.yml'
+          if ! printf '%s' "$FORMS_BASE" | grep -Eqx '[0-9a-f]{40}([0-9a-f]{24})?'; then
+            echo "::error::The base of the Issue Forms patch is not a commit SHA"
+            exit 1
           fi
-          git add -- .github/ISSUE_TEMPLATE
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -m "chore(forms): regenerate issue forms"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
+          if ! git -c core.hooksPath=/dev/null merge-base --is-ancestor "$FORMS_BASE" HEAD; then
+            echo "::error::The base of the Issue Forms patch is not part of Source_Code"
+            exit 1
+          fi
+          patch_file="$RUNNER_TEMP/issue-forms.patch"
+          printf '%s' "$FORMS_PATCH" | base64 -d > "$patch_file"
+          if grep -Eq '^(rename|copy) (from|to) |^(old|new) mode |^deleted file mode |^similarity index |^GIT binary patch|^Binary files ' "$patch_file" \
+            || grep -E '^new file mode ' "$patch_file" | grep -qvx 'new file mode 100644' \
+            || grep -E '^diff --git ' "$patch_file" | grep -Eqvx "diff --git a/($allowed) b/\\1" \
+            || grep -E '^(---|\+\+\+) ' "$patch_file" | grep -Eqvx -e "--- a/$allowed|\+\+\+ b/$allowed|--- /dev/null"; then
+            echo "::error::The Issue Forms patch changes more than .yml files in .github/ISSUE_TEMPLATE/"
+            exit 1
+          fi
+          paths="$(git -c core.hooksPath=/dev/null apply --numstat "$patch_file" | cut -f3)"
+          if [ -z "$paths" ] || printf '%s\n' "$paths" | grep -Eqvx "$allowed"; then
+            echo "::error::The Issue Forms patch changes more than .yml files in .github/ISSUE_TEMPLATE/"
+            exit 1
+          fi
+          git -c core.hooksPath=/dev/null checkout -q --detach "$FORMS_BASE"
+          git -c core.hooksPath=/dev/null apply --index "$patch_file"
+          staged="$(git -c core.hooksPath=/dev/null diff --cached --name-only)"
+          if [ -z "$staged" ] || printf '%s\n' "$staged" | grep -Eqvx "$allowed"; then
+            echo "::error::The staged changes are not limited to .yml files in .github/ISSUE_TEMPLATE/"
+            exit 1
+          fi
+          git -c core.hooksPath=/dev/null -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "chore(forms): regenerate issue forms"
 
       # The token is given to this step only (never stored in .git/config); it runs git only, with hooks
       # turned off. A rejected push (Source_Code moved on) fetches and moves the one forms commit onto the
@@ -131,7 +169,6 @@ jobs:
       # lie ahead of the remote, touching .github/ISSUE_TEMPLATE/ only. Only an owner push changes what the
       # generator reads (world names and ids, tags, dictionaries, config), and such a push runs this workflow again.
       - name: Push the Issue Forms
-        if: steps.forms.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

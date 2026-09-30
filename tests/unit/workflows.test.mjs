@@ -170,18 +170,58 @@ test("a token passed through env reaches only steps that run git and shell, neve
   assert.deepEqual(tokenSteps, ["publish.yml: forms: name: Push the Issue Forms"]);
 });
 
-test("publish forms: the generator runs in a step without the token; the push step rebases, never regenerates", () => {
-  const job = jobsOf(workflows["publish.yml"]).find((j) => j.name === "forms");
-  const steps = stepsOf(job.text);
-  const generate = steps.findIndex((s) => /\bnode scripts\/gen-issue-forms\.mjs\n/.test(s));
-  const push = steps.findIndex((s) => /push origin HEAD:refs\/heads\/Source_Code/.test(s));
-  assert.ok(generate >= 0 && push === generate + 1 && push === steps.length - 1, JSON.stringify({ generate, push }));
-  assert.doesNotMatch(steps[generate], /env:|token|auth/i, "no token, no auth header while node runs");
-  assert.match(steps[generate], /\n {8}id: forms\n/);
-  assert.match(steps[generate], /git add -- \.github\/ISSUE_TEMPLATE\n[\s\S]*commit -m "chore\(forms\): regenerate issue forms"\n {10}echo "changed=true" >> "\$GITHUB_OUTPUT"/);
-  assert.match(steps[generate], /echo "changed=false" >> "\$GITHUB_OUTPUT"\n {12}exit 0/);
-  assert.match(steps[push], /\n {8}if: steps\.forms\.outputs\.changed == 'true'\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {8}run: \|\n/);
-  assertFormsPushLoop(steps[push]);
+test("publish forms: generated in a read-only job without a token, handed over as a patch, pushed by a job without Node.js", () => {
+  const jobs = Object.fromEntries(jobsOf(workflows["publish.yml"]).map((j) => [j.name, j.text]));
+  // forms-check: contents: read only; runs the generator and outputs the base commit and the patch.
+  const generator = jobs["forms-check"];
+  assert.match(generator, /\n {4}permissions:\n {6}contents: read\n {4}outputs:\n {6}stale: \$\{\{ steps\.forms\.outputs\.stale \}\}\n {6}base: \$\{\{ steps\.forms\.outputs\.base \}\}\n {6}patch: \$\{\{ steps\.forms\.outputs\.patch \}\}\n {4}steps:\n/);
+  assert.doesNotMatch(generator, /github\.token|secrets\.|GH_TOKEN|GITHUB_TOKEN|persist-credentials: true|contents: write/, "no token reaches the generator job");
+  const prepare = stepsOf(generator).at(-1);
+  const prepared = [
+    "node scripts/gen-issue-forms.mjs --check; then",
+    'echo "stale=false" >> "$GITHUB_OUTPUT"',
+    "node scripts/gen-issue-forms.mjs\n",
+    "git add -- .github/ISSUE_TEMPLATE\n",
+    'patch="$(git diff --cached --full-index -- .github/ISSUE_TEMPLATE | base64 -w0)"',
+    'if [ -z "$patch" ]; then',
+    'if [ "${#patch}" -gt 100000 ]; then',
+    'echo "stale=true" >> "$GITHUB_OUTPUT"',
+    'echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"',
+    'echo "patch=$patch" >> "$GITHUB_OUTPUT"',
+  ].map((s) => prepare.indexOf(s));
+  assert.ok(prepared.every((p, i) => p > (prepared[i - 1] ?? -1)), JSON.stringify(prepared));
+
+  // forms: checkout, check and commit the patch (no token), push (token). No Node.js, npm or npx at all.
+  const writer = jobs.forms;
+  assert.doesNotMatch(writer, /setup-node/);
+  const steps = stepsOf(writer);
+  assert.doesNotMatch(steps.join("\n"), /\b(node|npm|npx)\b/);
+  assert.equal(steps.length, 3);
+  assert.match(steps[0], /^name: Check out Source_Code\n {8}uses: actions\/checkout@\S+ # v7\.0\.1\n {8}with:\n {10}ref: Source_Code\n {10}fetch-depth: 0\n {10}persist-credentials: false\n/);
+  const [, apply, push] = steps;
+  assert.doesNotMatch(apply, /token|auth/i, "no token while the patch is checked and applied");
+  assert.match(apply, /^name: Check and commit the Issue Forms patch\n {8}env:\n {10}FORMS_BASE: \$\{\{ needs\.forms-check\.outputs\.base \}\}\n {10}FORMS_PATCH: \$\{\{ needs\.forms-check\.outputs\.patch \}\}\n {8}run: \|\n/);
+  const applied = [
+    "allowed='\\.github/ISSUE_TEMPLATE/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.yml'",
+    "grep -Eqx '[0-9a-f]{40}([0-9a-f]{24})?'",
+    'merge-base --is-ancestor "$FORMS_BASE" HEAD; then',
+    'printf \'%s\' "$FORMS_PATCH" | base64 -d > "$patch_file"',
+    "grep -Eq '^(rename|copy) (from|to) |^(old|new) mode |^deleted file mode |^similarity index |^GIT binary patch|^Binary files ' \"$patch_file\"",
+    "grep -qvx 'new file mode 100644'",
+    'grep -Eqvx "diff --git a/($allowed) b/\\\\1"',
+    'grep -Eqvx -e "--- a/$allowed|\\+\\+\\+ b/$allowed|--- /dev/null"; then',
+    'apply --numstat "$patch_file" | cut -f3)"',
+    'if [ -z "$paths" ] || printf \'%s\\n\' "$paths" | grep -Eqvx "$allowed"; then',
+    'checkout -q --detach "$FORMS_BASE"',
+    'apply --index "$patch_file"',
+    'staged="$(git -c core.hooksPath=/dev/null diff --cached --name-only)"',
+    'if [ -z "$staged" ] || printf \'%s\\n\' "$staged" | grep -Eqvx "$allowed"; then',
+    'commit -q -m "chore(forms): regenerate issue forms"',
+  ].map((s) => apply.indexOf(s));
+  assert.ok(applied.every((p, i) => p > (applied[i - 1] ?? -1)), JSON.stringify(applied));
+  assert.doesNotMatch(apply, /git (am|apply --3way|apply --unsafe-paths)/);
+  assert.match(push, /^name: Push the Issue Forms\n {8}env:\n {10}GH_TOKEN: \$\{\{ github\.token \}\}\n {8}run: \|\n/);
+  assertFormsPushLoop(push);
 });
 
 test("_deploy-pages: reusable, builds Source_Code HEAD containing the expected commit, validates, stamps, deploys", () => {
@@ -213,11 +253,20 @@ test("publish: check with the push baseline, read-only forms check, forms writer
   assert.match(yaml, /GH_TOKEN: \$\{\{ github\.token \}\}/);
   assert.match(yaml, /echo "::add-mask::\$auth_b64"/);
   assert.match(yaml, /user\.name="github-actions\[bot\]" -c user\.email="41898282\+github-actions\[bot\]@users\.noreply\.github\.com"/);
-  assert.match(yaml, /commit -m "chore\(forms\): regenerate issue forms"/);
+  assert.match(yaml, /commit -q -m "chore\(forms\): regenerate issue forms"/);
   assert.match(yaml, /for attempt in 1 2 3 4; do/);
   // deploy: reusable workflow in the pages-deploy queue
   assert.match(yaml, /^ {2}deploy:\n {4}needs: check\n {4}permissions:\n {6}contents: read\n {6}pages: write\n {6}id-token: write\n {4}concurrency:\n {6}group: pages-deploy\n {6}cancel-in-progress: false\n {4}uses: \.\/\.github\/workflows\/_deploy-pages\.yml\n {4}with:\n {6}expected_sha: \$\{\{ github\.sha \}\}/m);
-  assert.deepEqual(expressions(yaml), ["${{ github.event.before }}", "${{ github.sha }}", "${{ github.token }}", "${{ steps.forms.outputs.stale }}"]);
+  assert.deepEqual(expressions(yaml), [
+    "${{ github.event.before }}",
+    "${{ github.sha }}",
+    "${{ github.token }}",
+    "${{ needs.forms-check.outputs.base }}",
+    "${{ needs.forms-check.outputs.patch }}",
+    "${{ steps.forms.outputs.base }}",
+    "${{ steps.forms.outputs.patch }}",
+    "${{ steps.forms.outputs.stale }}",
+  ]);
 });
 
 test("apply-approved: approved label, daily schedule or manual run; one writer at a time; deploy and report", () => {
