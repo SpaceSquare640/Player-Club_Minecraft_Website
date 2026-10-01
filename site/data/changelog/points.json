@@ -355,6 +355,30 @@
         "type": "issue",
         "issue": 17
       }
+    },
+    {
+      "id": "c0016",
+      "date": "2026-10-02",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0011",
+        "dimension": "overworld",
+        "name": "試煉密室 1"
+      },
+      "summary": {
+        "en": "Added point: 試煉密室 1",
+        "zh-TW": "新增座標：試煉密室 1"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 18
+      }
     }
   ]
 }

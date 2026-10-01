@@ -61,6 +61,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-01T15:20:14Z",
       "updatedAt": "2026-10-01T15:20:14Z"
+    },
+    {
+      "id": "p0011",
+      "dimension": "overworld",
+      "name": "試煉密室 1",
+      "tags": ["trial_chambers"],
+      "x": -751,
+      "y": -21,
+      "z": 754,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-01T17:28:33Z",
+      "updatedAt": "2026-10-01T17:28:33Z"
     }
   ]
 }
