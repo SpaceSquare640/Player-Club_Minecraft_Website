@@ -331,6 +331,30 @@
         "type": "issue",
         "issue": 16
       }
+    },
+    {
+      "id": "c0015",
+      "date": "2026-10-01",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0010",
+        "dimension": "the_nether",
+        "name": "Base 1"
+      },
+      "summary": {
+        "en": "Added point: Base 1",
+        "zh-TW": "新增座標：Base 1"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / The Nether",
+        "zh-TW": "座標資料：Player_Club／地獄"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 17
+      }
     }
   ]
 }

@@ -49,6 +49,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-01T15:18:45Z",
       "updatedAt": "2026-10-01T15:18:45Z"
+    },
+    {
+      "id": "p0010",
+      "dimension": "the_nether",
+      "name": "Base 1",
+      "tags": ["base"],
+      "x": -4,
+      "y": 92,
+      "z": -11,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-01T15:20:14Z",
+      "updatedAt": "2026-10-01T15:20:14Z"
     }
   ]
 }
