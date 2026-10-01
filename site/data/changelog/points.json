@@ -235,6 +235,30 @@
         "type": "issue",
         "issue": 13
       }
+    },
+    {
+      "id": "c0011",
+      "date": "2026-10-01",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0007",
+        "dimension": "overworld",
+        "name": "自動炸石&燒石機"
+      },
+      "summary": {
+        "en": "Added point: 自動炸石&燒石機",
+        "zh-TW": "新增座標：自動炸石&燒石機"
+      },
+      "scope": {
+        "en": "Point data: Builder World / Overworld",
+        "zh-TW": "座標資料：Builder World／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 12
+      }
     }
   ]
 }
