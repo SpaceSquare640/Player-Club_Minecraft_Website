@@ -26,18 +26,6 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-01T10:06:11Z",
       "updatedAt": "2026-10-01T10:06:11Z"
-    },
-    {
-      "id": "p0007",
-      "dimension": "overworld",
-      "name": "自動炸石&燒石機",
-      "tags": ["other"],
-      "x": 368,
-      "y": 58,
-      "z": 160,
-      "submittedBy": "SpaceSquare640",
-      "createdAt": "2026-10-01T10:06:51Z",
-      "updatedAt": "2026-10-01T10:06:51Z"
     }
   ]
 }
