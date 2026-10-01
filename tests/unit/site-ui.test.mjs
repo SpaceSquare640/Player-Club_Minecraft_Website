@@ -1,5 +1,6 @@
-// Page shell, styles and UI sources: CSP, assets, design tokens, dictionary keys used by the UI,
-// the built-in English error text, and the local preview server.
+// Page shell, styles and UI sources: CSP, assets, design tokens and their contrast, dictionary keys used
+// by the UI, the Discord link label, reduced motion, the built-in English error text, and the local
+// preview server.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
@@ -7,6 +8,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { REPO_ROOT } from "../../scripts/lib/load-data.mjs";
 import { SITE_ROOT, contentType, createPreviewServer, resolveRequestPath } from "../../scripts/serve.mjs";
+import { prefersReducedMotion } from "../../site/js/ui/dom.js";
 import { FALLBACK_TEXT } from "../../site/js/ui/error-view.js";
 
 const SITE = path.join(REPO_ROOT, "site");
@@ -15,6 +17,7 @@ const html = await read("index.html");
 const cssFiles = ["css/tokens.css", "css/base.css", "css/components.css"];
 const css = Object.fromEntries(await Promise.all(cssFiles.map(async (f) => [f, await read(f)])));
 const en = JSON.parse(await read("i18n/en.json")).messages;
+const zh = JSON.parse(await read("i18n/zh-TW.json")).messages;
 
 async function listFiles(dir, ext) {
   const out = [];
@@ -92,6 +95,75 @@ test("CSS: every custom property used is defined in the token file (or base.css)
   assert.match(css["css/components.css"], /@media \(forced-colors: active\)/);
 });
 
+// WCAG 2.2 contrast of the token colours (design spec 3.2). Translucent tokens are composited over
+// --pc-color-bg first, as they are painted on the page background.
+function tokenColors(text) {
+  const colors = new Map();
+  for (const m of text.matchAll(/(--pc-[a-z0-9-]+)\s*:\s*(#[0-9a-f]{6}|rgba\([^)]*\))\s*;/gi)) {
+    const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(m[2]);
+    const rgba = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(m[2]);
+    assert.ok(hex || rgba, `${m[1]}: ${m[2]}`);
+    const [r, g, b] = hex ? hex.slice(1).map((v) => parseInt(v, 16)) : rgba.slice(1, 4).map(Number);
+    colors.set(m[1].slice("--pc-".length), { r, g, b, a: hex ? 1 : Number(rgba[4]) });
+  }
+  return colors;
+}
+const composite = (fg, bg) => ({ ...Object.fromEntries(["r", "g", "b"].map((c) => [c, fg[c] * fg.a + bg[c] * (1 - fg.a)])), a: 1 });
+const linear = (c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : ((c / 255 + 0.055) / 1.055) ** 2.4);
+const luminance = ({ r, g, b }) => 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test("CSS: token colour pairs of the design contrast table meet WCAG AA", () => {
+  const colors = tokenColors(css["css/tokens.css"]);
+  const bg = colors.get("color-bg");
+  assert.equal(bg.a, 1, "the page background is opaque");
+  const color = (name) => {
+    assert.ok(colors.has(name), name);
+    const value = colors.get(name);
+    return value.a < 1 ? composite(value, bg) : value;
+  };
+  const TEXT = 4.5;
+  const NON_TEXT = 3;
+  const pairs = [
+    ["color-text", "color-bg", TEXT],
+    ["color-text", "color-surface", TEXT],
+    ["color-text", "color-surface-raised", TEXT],
+    ["color-text", "tint-secondary", TEXT],
+    ["color-text-muted", "color-bg", TEXT],
+    ["color-text-muted", "color-surface", TEXT],
+    ["color-text-muted", "color-surface-raised", TEXT],
+    ["color-primary", "color-bg", TEXT],
+    ["color-primary", "color-surface", TEXT],
+    ["color-secondary", "color-bg", TEXT],
+    ["color-secondary", "color-surface", TEXT],
+    ["color-secondary", "tint-secondary", TEXT],
+    ["color-success", "color-bg", TEXT],
+    ["color-success", "color-surface", TEXT],
+    ["color-danger", "color-bg", TEXT],
+    ["color-danger", "color-surface", TEXT],
+    ["color-text-on-accent", "color-primary", TEXT],
+    ["color-text-on-accent", "color-primary-hover", TEXT],
+    ["color-text-on-accent", "color-primary-active", TEXT],
+    ["color-border-strong", "color-bg", NON_TEXT],
+    ["color-border-strong", "color-surface", NON_TEXT],
+  ];
+  const failing = [];
+  for (const [fg, back, min] of pairs) {
+    const ratio = contrast(color(fg), color(back));
+    if (ratio < min) failing.push(`${fg} on ${back}: ${ratio.toFixed(2)}:1 < ${min}:1`);
+  }
+  assert.deepEqual(failing, []);
+  // Spot values from the table (rounded to one decimal).
+  assert.equal(contrast(color("color-text"), color("color-bg")).toFixed(1), "17.5");
+  assert.equal(contrast(color("color-secondary"), color("tint-secondary")).toFixed(1), "5.4");
+  // Light text on solid purple is 2.8:1, so the spec never paints the secondary colour as a background.
+  assert.ok(contrast(color("color-text"), color("color-secondary")) < TEXT);
+  for (const [file, text] of Object.entries(css)) assert.doesNotMatch(text, /background(?:-color)?\s*:\s*var\(--pc-color-secondary(?:-hover)?\)/, file);
+});
+
 test("CSS: UI Verse adaptations keep their source notes; no text shadows or remote imports", () => {
   const components = css["css/components.css"];
   for (const [author, name] of [["chase2k25", "rare-quail-40"], ["elijahgummer", "kind-pig-24"], ["vinodjangid07", "wonderful-squid-57"]]) {
@@ -116,6 +188,50 @@ test("UI dictionary keys: every literal key used in site/js exists in en", () =>
     for (const pair of m[1].split(";")) if (!Object.hasOwn(en, pair.split(":")[1])) missing.push(`index.html: ${pair}`);
   }
   assert.deepEqual(missing, []);
+});
+
+test("Discord links: accessible names come from dictionary keys present in en and zh-TW, applied by app.js", () => {
+  const header = /<a\b[^>]*\bid="pc-discord"[^>]*>/.exec(html)?.[0];
+  assert.ok(header, "header Discord link");
+  const ariaKey = /data-i18n-attr="aria-label:([^"]+)"/.exec(header)?.[1];
+  assert.equal(ariaKey, "discord.aria");
+  const footer = /<a\b[^>]*\bid="pc-footer-discord"[^>]*>\s*<img\b[^>]*>/.exec(html)?.[0];
+  assert.ok(footer, "footer badge link");
+  const altKey = /data-i18n-attr="alt:([^"]+)"/.exec(footer)?.[1];
+  assert.equal(altKey, "footer.badgeAlt");
+  for (const key of [ariaKey, altKey]) {
+    for (const [lang, dict] of [["en", en], ["zh-TW", zh]]) {
+      assert.equal(typeof dict[key], "string", `${lang} ${key}`);
+      assert.notEqual(dict[key].trim(), "", `${lang} ${key}`);
+    }
+  }
+  assert.match(en[ariaKey], /Discord.*\(opens in a new tab\)$/);
+  assert.match(zh[ariaKey], /Discord.*（在新分頁開啟）$/);
+  const app = jsSources.find(({ file }) => file.endsWith(path.join("js", "app.js"))).source;
+  assert.match(app, /querySelectorAll\("\[data-i18n-attr\]"\)\) \{[\s\S]*?el\.setAttribute\(attr\.trim\(\), t\(key\.trim\(\)\)\);/);
+  assert.match(app, /discord: \$\("pc-discord"\),\s*footerDiscord: \$\("pc-footer-discord"\),/);
+});
+
+test("prefersReducedMotion follows matchMedia and is false when matchMedia is missing", () => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, "matchMedia");
+  const original = globalThis.matchMedia;
+  const queries = [];
+  try {
+    for (const matches of [true, false]) {
+      globalThis.matchMedia = (query) => {
+        queries.push(query);
+        return { matches, media: query };
+      };
+      assert.equal(prefersReducedMotion(), matches);
+    }
+    delete globalThis.matchMedia;
+    assert.equal(prefersReducedMotion(), false);
+  } finally {
+    if (saved) Object.defineProperty(globalThis, "matchMedia", saved);
+    else delete globalThis.matchMedia;
+  }
+  assert.deepEqual(queries, ["(prefers-reduced-motion: reduce)", "(prefers-reduced-motion: reduce)"]);
+  assert.equal(globalThis.matchMedia, original, "matchMedia restored");
 });
 
 test("error view: the built-in English text matches the English dictionary", () => {

@@ -1,7 +1,7 @@
 // site/js/lib/hash.js: URL hash spec (parse, validation order, canonical serialisation, links).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { changelogLink, cleanQuery, defaultState, parseHash, serializeHash, toHref } from "../../site/js/lib/hash.js";
+import { MAX_HASH_LENGTH, changelogLink, cleanQuery, defaultState, parseHash, serializeHash, toHref } from "../../site/js/lib/hash.js";
 import { createHashContext } from "../fixtures/front.mjs";
 
 const ctx = createHashContext();
@@ -161,4 +161,44 @@ test("changelogLink: existing point, removed point, spawn, unknown world, points
   assert.deepEqual(changelogLink(point("player_club", "p0001"), createHashContext({ loaded: [] })), { kind: "pending" });
   assert.deepEqual(changelogLink({ target: { type: "spawn", worldId: "player_club" } }, ctx), { kind: "spawn", href: "#" });
   assert.deepEqual(changelogLink({ target: { type: "spawn", worldId: "survival_two" } }, ctx), { kind: "spawn", href: "#world=survival_two" });
+});
+
+// Many tags (architecture 4.8 item 37). Ids use the longest snake id (32 characters) to stress the length limit.
+function withManyTags(count) {
+  const many = createHashContext();
+  const ids = Array.from({ length: count }, (_, i) => `tag_${String(i + 1).padStart(2, "0")}_${"x".repeat(25)}`);
+  many.tags = [...many.tags, ...ids.map((id) => ({ id, group: "facility", name: { en: id, "zh-TW": id }, dimensions: ["overworld"] }))];
+  return { many, ids };
+}
+
+test("40 tags serialise in tags.json order, parse back unchanged and stay within 2048 characters", () => {
+  const { many, ids } = withManyTags(40);
+  assert.ok(ids.every((id) => id.length === 32));
+  const state = { ...defaultState(many), tagIds: [...ids].reverse() };
+  const hash = serializeHash(state, many);
+  assert.equal(hash, `tags=${ids.join(",")}`);
+  assert.ok(hash.length <= MAX_HASH_LENGTH, String(hash.length));
+  const parsed = parseHash(`#${hash}`, many);
+  assert.deepEqual(parsed.dropped, []);
+  assert.deepEqual(parsed.state.tagIds, ids);
+  assert.equal(serializeHash(parsed.state, many), hash);
+});
+
+test("many long tags: a hash of exactly 2048 characters is read, one character more falls back to defaults", () => {
+  const { many, ids } = withManyTags(61);
+  const tagsOnly = serializeHash({ ...defaultState(many), tagIds: ids }, many);
+  const pad = MAX_HASH_LENGTH - tagsOnly.length - "q=&".length;
+  assert.ok(pad >= 1 && pad < 100, String(pad));
+  const atLimit = serializeHash({ ...defaultState(many), tagIds: ids, query: "a".repeat(pad) }, many);
+  assert.equal(atLimit.length, MAX_HASH_LENGTH);
+  const read = parseHash(`#${atLimit}`, many);
+  assert.deepEqual(read.dropped, []);
+  assert.deepEqual(read.state.tagIds, ids);
+  assert.equal(read.state.query.length, pad);
+
+  const over = serializeHash({ ...defaultState(many), tagIds: ids, query: "a".repeat(pad + 1) }, many);
+  assert.equal(over.length, MAX_HASH_LENGTH + 1);
+  const fallback = parseHash(`#${over}`, many);
+  assert.deepEqual(fallback.state, defaultState(many));
+  assert.deepEqual(reasons(fallback.dropped), ["*:tooLong"]);
 });

@@ -192,6 +192,36 @@ test("spawn: X / Y / Z all required, '-' rejected, R05 and target checks", () =>
   assert.deepEqual(keys(evaluate("spawn", { target_id: "spawn:player_club", x: "1", y: "999", z: "3" }).errors), ["R03:coordRange"]);
 });
 
+test("spawn: F3 and X / Y / Z filled together is rejected with R03 f3AndXyz and changes nothing", () => {
+  const both = evaluate("spawn", { target_id: "spawn:player_club", f3: "Block: 8 100 -3", x: "8", y: "100", z: "-3" });
+  assert.deepEqual(keys(both.errors), ["R03:f3AndXyz"]);
+  assert.equal(both.ok, false);
+  assert.deepEqual(both.changedFields, []);
+  const oneAxis = evaluate("spawn", { target_id: "spawn:player_club", f3: "XYZ: 8.5 / 100 / -3.2", y: "100" });
+  assert.deepEqual(keys(oneAxis.errors), ["R03:f3AndXyz"], "a single axis next to the F3 line is enough");
+});
+
+test("add / edit: a multi-select with 40 tags keeps every tag, deduplicated, in tags.json order", () => {
+  const dataset = createDataset();
+  const ids = Array.from({ length: 40 }, (_, i) => `tag_${String(i + 1).padStart(2, "0")}`);
+  dataset.tags.tags.push(...ids.map((id, i) => ({ id, group: "facility", name: { en: `Tag ${i + 1}`, "zh-TW": `標籤 ${i + 1}` }, dimensions: ["overworld"] })));
+  const options = ids.map((id, i) => `Tag ${i + 1} / 標籤 ${i + 1} (${id})`);
+  const selected = [...options].reverse().concat(options[0]);
+
+  const parsed = parseIssueBody(renderBody("add", { ...ADD_VALUES, tags: selected }), "add");
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.values.tags, selected.join(", "), "the multi-select line is kept whole");
+
+  const add = evaluate("add", { ...ADD_VALUES, tags: selected }, {}, dataset);
+  assert.deepEqual(add.errors, []);
+  assert.deepEqual(add.request.tags, ids);
+
+  const edit = evaluate("edit", { target_id: "p0001", tags: selected }, {}, dataset);
+  assert.deepEqual(edit.errors, []);
+  assert.deepEqual(edit.changedFields, ["tags"]);
+  assert.deepEqual(edit.request.tags, ids);
+});
+
 test("injection strings are kept as inert data", () => {
   const payloads = ["$(touch /tmp/pwned)", "`id`", "${{ github.token }}", "<img src=x onerror=alert(1)>", "'; rm -rf / #"];
   for (const payload of payloads) {

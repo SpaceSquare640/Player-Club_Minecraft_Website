@@ -51,6 +51,15 @@ test("buildSpawnCard: only on the Overworld tab, generated from world.spawn", ()
   assert.equal(buildSpawnCard(worlds[1], "overworld").copyText, "0 64 0");
 });
 
+test("buildSpawnCard: coordinates and copy text equal formatCopyText(world.spawn)", () => {
+  const [world] = createHashContext().worlds;
+  for (const spawn of [world.spawn, { x: -30000000, y: -64, z: 30000000 }, { x: 0, y: 320, z: -1 }, { x: 12, y: null, z: -34 }]) {
+    const card = buildSpawnCard({ ...world, spawn }, "overworld");
+    assert.equal(card.copyText, formatCopyText(spawn), JSON.stringify(spawn));
+    assert.equal(formatCopyText(card), formatCopyText(spawn), "the card shows the same values it copies");
+  }
+});
+
 test("normalizeSearch: NFKC, lower case, collapsed whitespace", () => {
   assert.equal(normalizeSearch(`  ＶＩＬＬＡＧＥ${String.fromCodePoint(0x3000)}１  `), "village 1"); // ideographic space
   assert.equal(normalizeSearch("Nether\tFortress"), "nether fortress");
@@ -82,6 +91,19 @@ test("matchPoint: tags OR, AND with the query, optional dimension", () => {
   assert.equal(matchPoint(village, { query: "village", tagIds: ["nether_fortress"] }, ctx.tags), false);
   assert.equal(matchPoint(village, { dimension: "overworld" }), true);
   assert.equal(matchPoint(village, { dimension: "the_nether" }), false);
+});
+
+test("matchPoint with many tags (40 on the point and 40 selected)", () => {
+  const ids = Array.from({ length: 40 }, (_, i) => `tag_${String(i + 1).padStart(2, "0")}`);
+  const tags = ids.map((id, i) => ({ id, group: "facility", dimensions: ["overworld"], name: { en: `Tag ${i + 1}`, "zh-TW": `標籤${i + 1}號` } }));
+  const point = { id: "p0042", dimension: "overworld", name: "Hub", tags: ids, submittedBy: "friend-01" };
+  const others = Array.from({ length: 40 }, (_, i) => `other_${i + 1}`);
+  assert.equal(matchPoint(point, { tagIds: others }, tags), false, "none of 40 selected tags");
+  assert.equal(matchPoint(point, { tagIds: [...others, "tag_40"] }, tags), true, "OR: the last of 41 selected tags matches");
+  assert.equal(matchPoint({ ...point, tags: ["tag_40"] }, { tagIds: ids }, tags), true, "one tag against 40 selected");
+  assert.equal(matchPoint(point, { query: "標籤40號", tagIds: ids }, tags), true, "query reaches the name of the 40th tag");
+  assert.equal(matchPoint(point, { query: "tag 40", tagIds: ids }, tags), true);
+  assert.equal(matchPoint(point, { query: "tag 41", tagIds: ids }, tags), false, "AND with the query");
 });
 
 test("sortPoints: createdAt descending, then numeric id descending; input untouched", () => {

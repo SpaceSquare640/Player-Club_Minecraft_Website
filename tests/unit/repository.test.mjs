@@ -56,6 +56,19 @@ test("loadCore: manifest first, no-cache fetches, flattened and frozen result, c
   assert.equal(requests.length, 6, "cached");
 });
 
+test("seeds stay strings and unchanged, including both int64 ends (no Number rounding)", async () => {
+  const seeds = ["652938494491123000", "9223372036854775807", "-9223372036854775808"];
+  const ds = createDataset();
+  ds.worlds.worlds = seeds.map((seed, i) => ({ ...ds.worlds.worlds[0], id: i === 0 ? "player_club" : `seed_world_${i}`, seed }));
+  // Raw text on the wire: the seeds are JSON strings; as numbers, 9223372036854775807 would become 2^63.
+  const worldsText = JSON.stringify(ds.worlds);
+  for (const seed of seeds) assert.ok(worldsText.includes(`"seed":"${seed}"`), seed);
+  const { fetch } = createFakeFetch({ ...routesFor(ds), [`${BASE}worlds.json`]: worldsText });
+  const core = await createRepository({ baseUrl: BASE, fetch }).loadCore();
+  assert.deepEqual(core.worlds.map((w) => w.seed), seeds);
+  for (const world of core.worlds) assert.equal(typeof world.seed, "string");
+});
+
 test("baseUrl without a trailing slash is treated as a directory", async () => {
   const { fetch, requests } = createFakeFetch(routesFor());
   await createRepository({ baseUrl: BASE.slice(0, -1), fetch }).loadCore();
