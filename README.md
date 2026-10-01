@@ -76,7 +76,7 @@ tests/          Unit tests
 - Node.js 22 or later
 - npm (bundled with Node.js)
 
-The website is plain HTML, CSS and JavaScript with no build step. Node.js is used only for local preview, data validation, tests and the maintenance scripts. The only dependencies are `ajv` and `ajv-formats` (dev dependencies, locked in `package-lock.json`).
+The website is plain HTML, CSS and JavaScript with no build step. Node.js is used only for local preview, data validation, tests and the maintenance scripts. The only direct dependencies are `ajv` and `ajv-formats` (dev dependencies, locked in `package-lock.json`).
 
 #### Setup
 
@@ -115,7 +115,7 @@ Open http://127.0.0.1:5173/. The preview server binds to 127.0.0.1 only and serv
 npm run changelog:update -- --summary-en "..." --summary-zh "..." --scope-en "..." --scope-zh "..." [--date YYYY-MM-DD] [--dry-run]
 ```
 
-Change log text is public. Do not include internal notes or local paths; the script rejects them.
+Change log text is public. Do not include internal notes or local paths. The script rejects text that matches known patterns (such as tool names, note-related words, and Windows and home directory paths), but it cannot catch all internal information, so check the text yourself before pushing.
 
 #### Owner data maintenance
 
@@ -128,7 +128,7 @@ The owner edits the JSON data directly and pushes to `Source_Code` without a pul
    - Point or world spawn changes: `npm run changelog:sync` adds the "Coordinate changes" entries and fills the timestamps.
    - Site or feature changes, seed changes and new worlds: `npm run changelog:update`.
    - Changes to worlds, tags or dictionaries: also run `npm run gen:forms`.
-     - If the forms-check job of the publish workflow fails because the forms diff is over 100,000 characters, run `npm run gen:forms` locally and push the result.
+     - If the forms-check job of the publish workflow fails because the encoded forms patch is over the size limit (about 75 KB of changes), run `npm run gen:forms` locally and push the result.
 5. Run `npm run check` and make sure it passes.
 6. Commit and push to `Source_Code`. The publish workflow then runs `npm run check:ci`, regenerates the Issue forms when needed and deploys the website. If validation fails, nothing is deployed and the website keeps the previous version; fix the problem and push again.
 
@@ -235,7 +235,7 @@ tests/          單元測試
 - Node.js 22 以上
 - npm（隨 Node.js 安裝）
 
-網站為純 HTML、CSS、JavaScript，無建置步驟。Node.js 僅用於本機預覽、資料驗證、測試與維護腳本。依賴只有 `ajv` 與 `ajv-formats`（devDependencies，版本鎖定於 `package-lock.json`）。
+網站為純 HTML、CSS、JavaScript，無建置步驟。Node.js 僅用於本機預覽、資料驗證、測試與維護腳本。直接依賴只有 `ajv` 與 `ajv-formats`（devDependencies，版本鎖定於 `package-lock.json`）。
 
 #### 安裝
 
@@ -274,7 +274,7 @@ npm run serve
 npm run changelog:update -- --summary-en "..." --summary-zh "..." --scope-en "..." --scope-zh "..." [--date YYYY-MM-DD] [--dry-run]
 ```
 
-變更紀錄內容會公開，不得包含內部筆記或本機路徑，腳本會拒絕這類文字。
+變更紀錄內容會公開，不得包含內部筆記或本機路徑。腳本會拒絕符合已知樣式的文字（例如工具名稱、筆記相關字詞、Windows 與家目錄路徑），但無法攔下所有內部資訊，推送前仍需自行檢查。
 
 #### 擁有者資料維護
 
@@ -287,7 +287,7 @@ npm run changelog:update -- --summary-en "..." --summary-zh "..." --scope-en "..
    - 座標或世界出生座標變更：`npm run changelog:sync` 會補「座標更動」條目與時間戳。
    - 網站或功能變更、seed 變更、新增世界：`npm run changelog:update`。
    - 世界、標籤或字典變更：另執行 `npm run gen:forms`。
-     - 若 publish workflow 的 forms-check 因表單差異超過 100,000 字元而失敗：在本機執行 `npm run gen:forms` 後推送結果。
+     - 若 publish workflow 的 forms-check 因表單差異過大（編碼後超過上限，約 75 KB）而失敗：在本機執行 `npm run gen:forms` 後推送結果。
 5. 執行 `npm run check`，確認全數通過。
 6. commit 後推送至 `Source_Code`。推送後由 publish workflow 執行 `npm run check:ci`、必要時重產 Issue 表單並部署網站；驗證失敗時不會部署，網站維持上一版，修正後再推送即可。
 
