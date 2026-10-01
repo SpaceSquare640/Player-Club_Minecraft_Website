@@ -196,26 +196,30 @@ jobs:
             echo "::error::The Issue Forms patch does more than change or add .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi
-          # git's count per file is "<added><TAB><deleted><TAB><path>". A binary section counts as
-          # "-<TAB>-<TAB><path>": where a hunk would start, git takes a line that begins with "Files " or
-          # "Binary files " and ends in " differ" as a binary patch, and applies it with --index as the blob
-          # named on its index line (any blob in the repository). Any other line there counts as "0<TAB>0",
-          # and git apply --index below then fails on it ("patch with only garbage").
+          # git's count per file is "<added><TAB><deleted><TAB><path>"; a regenerated form changes at least
+          # one line, so one of the two numbers must not be 0. A binary section counts as "-<TAB>-<TAB><path>":
+          # where a hunk would start, git takes a line that begins with "Files " or "Binary files " and ends in
+          # " differ" as a binary patch, and applies it with --index as the blob named on its index line (any
+          # blob in the repository). Any other line there counts as "0<TAB>0<TAB><path>": in the section of a
+          # changed file git apply then fails on it ("patch with only garbage"); in the section of an added
+          # file ("new file mode 100644") git takes it as a file without content, and the patch would apply
+          # and add an empty .yml. Both counts are refused here, before anything is applied.
           numstat="$(git -c core.hooksPath=/dev/null apply --numstat "$patch_file")"
-          if [ -z "$numstat" ] || printf '%s\n' "$numstat" | grep -Eqvx "[0-9]+$tab[0-9]+$tab$allowed"; then
+          if [ -z "$numstat" ] || printf '%s\n' "$numstat" | grep -Eqvx "([1-9][0-9]*$tab[0-9]+|[0-9]+$tab[1-9][0-9]*)$tab$allowed"; then
             echo "::error::The Issue Forms patch changes more than the text of .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi
           git -c core.hooksPath=/dev/null checkout -q --detach "$FORMS_BASE"
           git -c core.hooksPath=/dev/null apply --index "$patch_file"
           # Without rename detection a moved file shows up as a deletion (D), which is refused. A staged file
-          # that git counts as binary ("-<TAB>-") is refused too.
+          # that git counts as binary ("-<TAB>-") or as no changed line ("0<TAB>0", an empty added file) is
+          # refused too.
           staged="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --name-status)"
           modes="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --no-abbrev --raw)"
           counts="$(git -c core.hooksPath=/dev/null diff --cached --no-renames --numstat)"
           if [ -z "$staged" ] || printf '%s\n' "$staged" | grep -Eqvx "[AM]$tab$allowed" \
             || printf '%s\n' "$modes" | grep -Eqvx ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed" \
-            || printf '%s\n' "$counts" | grep -Eqvx "[0-9]+$tab[0-9]+$tab$allowed"; then
+            || printf '%s\n' "$counts" | grep -Eqvx "([1-9][0-9]*$tab[0-9]+|[0-9]+$tab[1-9][0-9]*)$tab$allowed"; then
             echo "::error::The staged changes are not limited to regular .yml files in .github/ISSUE_TEMPLATE/"
             exit 1
           fi

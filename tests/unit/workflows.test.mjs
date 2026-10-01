@@ -16,6 +16,8 @@ const PINS = {
   "actions/deploy-pages": ["368f82528645a54fb793d4d04e342629a3f51346", "v5.0.1"],
 };
 const REUSABLE = "./.github/workflows/_deploy-pages.yml";
+/** git runs with LC_ALL=C (the rest of the environment kept), so its output and messages are the English ones compared below. */
+const GIT_ENV = { ...process.env, LC_ALL: "C" };
 
 const names = (await readdir(DIR)).filter((n) => n.endsWith(".yml")).sort();
 const workflows = Object.fromEntries(await Promise.all(names.map(async (n) => [n, (await readFile(path.join(DIR, n), "utf8")).replace(/\r\n/g, "\n")])));
@@ -85,8 +87,11 @@ const PATCH_DENY = String.raw`^(rename|copy) (from|to|old|new) |^(old|new) mode 
 const SUMMARY_ALLOWED = " create mode 100644 $allowed";
 const STAGED_ALLOWED = "[AM]$tab$allowed";
 const RAW_ALLOWED = ":(000000|100644) 100644 [0-9a-f]+ [0-9a-f]+ [AM]$tab$allowed";
-/** git's line count per file (apply --numstat, diff --numstat); a binary file counts as "-<TAB>-". */
-const NUMSTAT_ALLOWED = "[0-9]+$tab[0-9]+$tab$allowed";
+/**
+ * git's line count per file (apply --numstat, diff --numstat): at least one changed line. A binary file counts
+ * as "-<TAB>-"; a section without a hunk, or an empty added file, as "0<TAB>0".
+ */
+const NUMSTAT_ALLOWED = "([1-9][0-9]*$tab[0-9]+|[0-9]+$tab[1-9][0-9]*)$tab$allowed";
 
 test("the four workflows exist", () => {
   for (const name of ["_deploy-pages.yml", "apply-approved.yml", "publish.yml", "validate-issue.yml"]) assert.ok(names.includes(name), name);
@@ -343,7 +348,7 @@ test("publish forms: the ---/+++ names of every file section must be its diff --
   // git apply --summary let it through; this rule refuses it before anything is applied.
   const moved = lines(`diff --git a/${T}/config.yml b/${T}/config.yml`, "index 1111111..2222222 100644", `--- a/${T}/config.yml`, `+++ b/${T}/1-add-point.yml`, "@@ -1 +1 @@", "-a", "+b");
   assert.equal(new RegExp(PATCH_DENY, "m").test(moved), false, "the header deny list does not see it");
-  const summary = execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--summary", "-"], { cwd: REPO_ROOT, input: moved, encoding: "utf8" });
+  const summary = execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--summary", "-"], { cwd: REPO_ROOT, input: moved, encoding: "utf8", env: GIT_ENV });
   assert.equal(summary, "", "git apply --summary does not see it");
   assert.equal(namesMatch(moved), false, "refused before it is applied");
   const refused = {
@@ -362,7 +367,7 @@ test("publish forms: the ---/+++ names of every file section must be its diff --
   assert.equal(staged.test(`M\t${T}/1-add-point.yml`), true);
 });
 
-test("publish forms: a binary section (\"Files ... differ\" instead of a hunk) is refused by git's line count; other lines fail to apply", { skip: HAS_AWK ? false : "awk is not installed" }, () => {
+test("publish forms: a binary section (\"Files ... differ\" instead of a hunk) and a section that counts 0 lines are refused by git's line count", { skip: HAS_AWK ? false : "awk is not installed" }, async () => {
   const apply = stepsOf(jobsOf(workflows["publish.yml"]).find((j) => j.name === "forms").text)[1];
   // Each rule is taken from the workflow exactly as written; the patches are read from stdin.
   const rule = (re) => {
@@ -380,7 +385,7 @@ test("publish forms: a binary section (\"Files ... differ\" instead of a hunk) i
   assert.equal(numstatRule, NUMSTAT_ALLOWED);
   assert.equal(countsRule, NUMSTAT_ALLOWED);
   const numstatLine = whole(numstatRule);
-  const gitApply = (option, patch) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", option, "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8" });
+  const gitApply = (option, patch) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", option, "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8", env: GIT_ENV });
   const rows = (text) => text.split("\n").filter(Boolean);
   const awkAccepts = (patch) => {
     try {
@@ -424,36 +429,53 @@ test("publish forms: a binary section (\"Files ... differ\" instead of a hunk) i
     assert.deepEqual(checks(patch), { ...all, numstat: false }, name);
   }
 
-  // Any other line there is no binary patch: git counts the section as "0<TAB>0", so the four checks let it
-  // through, but git cannot parse it. apply --index, run right after the line count (bash -e, not inside an
-  // if), then fails with "patch with only garbage" before anything is written. apply --check parses the
-  // patch the same way and writes nothing.
-  const garbageToGit = (patch) => {
+  // Any other line there is no binary patch: git counts the section as "0<TAB>0", and the line count refuses
+  // it (a regenerated form changes at least one line). In the section of a changed file git cannot parse that
+  // line either: apply --index, run right after the line count (bash -e, not inside an if), would fail with
+  // "patch with only garbage" before anything is written. In the section of an added file ("new file mode
+  // 100644") git takes it as a file without content: the patch applies and would add an empty .yml, so only
+  // the line count stops it. apply --check parses and checks the patch as apply does, and writes nothing.
+  const gitCheck = (patch) => {
     try {
-      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--check", "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
-      return false;
+      execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--check", "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8", env: GIT_ENV, stdio: ["pipe", "pipe", "pipe"] });
+      return "applies";
     } catch (error) {
-      return error.status === 128 && error.stderr.includes("patch with only garbage");
+      return error.status === 128 && error.stderr.includes("patch with only garbage") ? "garbage" : `fails: ${error.stderr.trim()}`;
     }
   };
-  const header = [`diff --git a/${X} b/${X}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${X}`, `+++ b/${X}`];
-  const garbage = {
-    "Files differ with a CRLF line end": lines(...header, "Files differ\r"),
-    '" differ" without "Files "': lines(...header, " differ"),
-    '"x differ"': lines(...header, "x differ"),
+  const header = {
+    changed: [`diff --git a/${X} b/${X}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${X}`, `+++ b/${X}`],
+    added: [`diff --git a/${X} b/${X}`, "new file mode 100644", `index ${sha("0")}..${sha("2")}`, "--- /dev/null", `+++ b/${X}`],
   };
-  for (const [name, patch] of Object.entries({ ...garbage, "after a text section": changed + garbage['" differ" without "Files "'] })) {
-    assert.equal(rows(gitApply("--numstat", patch)).at(-1), `0\t0\t${X}`, `${name}: git counts it as 0 lines`);
-    assert.deepEqual(checks(patch), all, name);
-    assert.equal(garbageToGit(patch), true, `${name}: git cannot parse it`);
+  const tails = { "Files differ with a CRLF line end": "Files differ\r", '" differ" without "Files "': " differ", '"x differ"': "x differ" };
+  const zero = [];
+  for (const [kind, rowsOfHeader] of Object.entries(header)) {
+    for (const [name, tail] of Object.entries(tails)) zero.push([`${kind} file, ${name}`, lines(...rowsOfHeader, tail), kind === "changed" ? "garbage" : "applies"]);
   }
-  for (const [name, patch] of [["changed form", changed], ["binary section", binary.changed]]) assert.equal(garbageToGit(patch), false, name);
+  zero.push(["changed file after a text section", changed + lines(...header.changed, " differ"), "garbage"]);
+  for (const [name, patch, byGit] of zero) {
+    assert.equal(rows(gitApply("--numstat", patch)).at(-1), `0\t0\t${X}`, `${name}: git counts it as 0 lines`);
+    assert.deepEqual(checks(patch), { ...all, numstat: false }, `${name}: refused before it is applied`);
+    assert.equal(gitCheck(patch), byGit, `${name}: git apply --check`);
+  }
   assert.match(apply, /^ {10}git -c core\.hooksPath=\/dev\/null apply --index "\$patch_file"$/m, "a failed apply ends the step");
   assert.doesNotMatch(workflows["publish.yml"], /^\s*shell:|set \+e/m);
 
-  // The staged files are counted again after the patch is applied.
-  assert.ok(numstatLine.test(`2\t0\t${X}`) && numstatLine.test(`1\t1\t${X}`));
-  for (const line of [`-\t-\t${X}`, `1\t1\tsite/data/config.json`, "1\t1\t.github/ISSUE_TEMPLATE/sub/x.yml", `1\t1\t${X}\textra`]) {
+  // Controls on a real form, where git can apply the section: a changed line passes the four checks; a binary
+  // section whose index line names the form's current blob and another form's blob applies as well, and only
+  // the line count refuses it.
+  const F = ".github/ISSUE_TEMPLATE/config.yml";
+  const [first, second] = (await readFile(path.join(REPO_ROOT, F), "utf8")).split("\n");
+  const git = (...args) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", ...args], { cwd: REPO_ROOT, encoding: "utf8", env: GIT_ENV }).trim();
+  const realChanged = lines(`diff --git a/${F} b/${F}`, `index ${sha("1")}..${sha("2")} 100644`, `--- a/${F}`, `+++ b/${F}`, "@@ -1,2 +1,2 @@", `-${first}`, `+${first} (changed)`, ` ${second}`);
+  const realBinary = lines(`diff --git a/${F} b/${F}`, `index ${git("hash-object", F)}..${git("rev-parse", "HEAD:.github/ISSUE_TEMPLATE/1-add-point.yml")} 100644`, `--- a/${F}`, `+++ b/${F}`, "Files differ");
+  assert.deepEqual(checks(realChanged), all, "changed form");
+  assert.deepEqual(checks(realBinary), { ...all, numstat: false }, "binary section of a form");
+  for (const [name, patch] of [["changed form", realChanged], ["binary section of a form", realBinary]]) assert.equal(gitCheck(patch), "applies", name);
+
+  // The staged files are counted again after the patch is applied; an empty added file counts "0<TAB>0".
+  assert.ok(numstatLine.test(`2\t0\t${X}`) && numstatLine.test(`1\t1\t${X}`) && numstatLine.test(`0\t1\t${X}`) && numstatLine.test(`10\t0\t${X}`));
+  for (const line of [`0\t0\t${X}`, `-\t-\t${X}`, `1\t1\tsite/data/config.json`, "1\t1\t.github/ISSUE_TEMPLATE/sub/x.yml", `1\t1\t${X}\textra`]) {
     assert.equal(numstatLine.test(line), false, line);
   }
 });
@@ -464,7 +486,7 @@ test("publish forms: the patch checks refuse renames (rename old/new too), copie
   const deny = new RegExp(PATCH_DENY, "m");
   const summaryLine = whole(SUMMARY_ALLOWED);
   // git reads each patch from stdin, exactly as the workflow asks it to; nothing is applied or written.
-  const summaryOf = (patch) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--summary", "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8" });
+  const summaryOf = (patch) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "apply", "--summary", "-"], { cwd: REPO_ROOT, input: patch, encoding: "utf8", env: GIT_ENV });
   const summaryAccepts = (patch) => summaryOf(patch).split("\n").filter(Boolean).every((line) => summaryLine.test(line));
   const X = ".github/ISSUE_TEMPLATE/x.yml";
   const patch = (from, to, ...lines) => [`diff --git a/${from} b/${to}`, ...lines, ""].join("\n");
