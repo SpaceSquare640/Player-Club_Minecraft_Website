@@ -9,7 +9,6 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { REPO_ROOT } from "../../scripts/lib/load-data.mjs";
 import { initI18n } from "../../site/js/i18n.js";
-import { formatCopyText } from "../../site/js/lib/coords.js";
 import { createCopyButton, createFallbackHost, writeClipboard } from "../../site/js/ui/copy.js";
 import { createScope } from "../../site/js/ui/dom.js";
 import { closeOpenMenu, createMenuButton } from "../../site/js/ui/menu.js";
@@ -40,25 +39,45 @@ before(async () => {
 
 after(() => dom.restore());
 
-/** Replaces globalThis.navigator (a getter in Node) for fn, then puts the original back. */
+/**
+ * Replaces globalThis.navigator (a getter in Node) for fn, then puts the original back. The restore check
+ * runs only when fn succeeded, so it never hides the original failure.
+ */
 async function withNavigator(value, fn) {
   const saved = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   const original = globalThis.navigator;
   Object.defineProperty(globalThis, "navigator", { value, configurable: true, writable: true });
+  let result;
   try {
-    return await fn();
+    result = await fn();
   } finally {
     if (saved) Object.defineProperty(globalThis, "navigator", saved);
     else delete globalThis.navigator;
-    assert.equal(globalThis.navigator, original, "navigator restored");
   }
+  assert.equal(globalThis.navigator, original, "navigator restored");
+  return result;
+}
+
+/** Appends nodes to the page and takes them off again after the test, also when it fails. */
+function mount(t, ...nodes) {
+  document.body.append(...nodes);
+  t.after(() => {
+    for (const node of nodes) node.remove();
+  });
+}
+
+/** Timer scope disposed after the test (clears the 2 s "copied" timers), also when it fails. */
+function testScope(t) {
+  const scope = createScope();
+  t.after(() => scope.dispose());
+  return scope;
 }
 
 const rejectingClipboard = { clipboard: { writeText: async () => Promise.reject(new Error("NotAllowedError: Document is not focused")) } };
 const isInput = (el) => el.tagName === "INPUT";
 const byRole = (role) => (el) => el.getAttribute("role") === role;
 
-function menuFixture() {
+function menuFixture(t) {
   const selected = [];
   const card = document.createElement("article");
   const anchor = createMenuButton({
@@ -70,7 +89,8 @@ function menuFixture() {
     ],
   });
   card.append(anchor);
-  document.body.append(card);
+  mount(t, card);
+  t.after(closeOpenMenu); // the open menu is module state shared by every test
   const [trigger] = anchor.children;
   const menu = () => anchor.find(byRole("menu"));
   const items = () => anchor.findAll(byRole("menuitem"));
@@ -79,8 +99,8 @@ function menuFixture() {
 
 // Menu button (24)
 
-test("menu button: opening renders the items in order and focuses the first one", async () => {
-  const { card, anchor, trigger, menu, items } = menuFixture();
+test("menu button: opening renders the items in order and focuses the first one", async (t) => {
+  const { card, anchor, trigger, menu, items } = menuFixture(t);
   assert.equal(trigger.getAttribute("aria-haspopup"), "menu");
   assert.equal(trigger.getAttribute("aria-expanded"), "false");
   assert.equal(trigger.getAttribute("aria-label"), "More actions: Village 1");
@@ -108,8 +128,8 @@ test("menu button: opening renders the items in order and focuses the first one"
   assert.equal(anchor.children.length, 1);
 });
 
-test("menu button: Escape closes the menu and returns focus to the button", async () => {
-  const { card, anchor, trigger, menu, items } = menuFixture();
+test("menu button: Escape closes the menu and returns focus to the button", async (t) => {
+  const { card, anchor, trigger, menu, items } = menuFixture(t);
   await trigger.click();
   document.activeElement.dispatch("keydown", { key: "ArrowDown" });
   items()[1].dispatch("keydown", { key: "Escape" });
@@ -128,16 +148,16 @@ test("menu button: Escape closes the menu and returns focus to the button", asyn
   assert.equal(document.activeElement, trigger);
 });
 
-test("menu button: closeOpenMenu, a second menu, Tab, outside clicks and selecting an item close it", async () => {
-  const first = menuFixture();
-  const second = menuFixture();
+test("menu button: closeOpenMenu, a second menu, Tab, outside clicks and selecting an item close it", async (t) => {
+  const first = menuFixture(t);
+  const second = menuFixture(t);
   closeOpenMenu(); // nothing open: no-op
 
   await first.trigger.click();
   closeOpenMenu();
   assert.equal(first.menu(), null);
   assert.equal(first.trigger.getAttribute("aria-expanded"), "false");
-  assert.notEqual(document.activeElement, first.trigger, "closeOpenMenu does not move focus");
+  assert.equal(document.activeElement, document.body, "closeOpenMenu does not return focus to the button");
 
   await first.trigger.click();
   await second.trigger.click();
@@ -190,14 +210,14 @@ test("writeClipboard reports failure when the Clipboard API is missing, throws o
   assert.deepEqual(written, ["-426 72 300"]);
 });
 
-test("copy button: when writing fails, the fallback field shows the exact text, focused and selected", async () => {
+test("copy button: when writing fails, the fallback field shows the exact text, focused and selected", async (t) => {
   const seed = "-9223372036854775808";
   for (const navigator of [{}, rejectingClipboard]) {
     await withNavigator(navigator, async () => {
-      const scope = createScope();
+      const scope = testScope(t);
       const host = createFallbackHost();
       const button = createCopyButton({ variant: "icon", value: () => seed, ariaLabel: en["world.seed.copy"], scope, fallbackHost: host });
-      document.body.append(button, host);
+      mount(t, button, host);
       assert.equal(host.hidden, true);
 
       await button.click();
@@ -215,14 +235,11 @@ test("copy button: when writing fails, the fallback field shows the exact text, 
       assert.equal(host.hidden, true);
       assert.equal(host.children.length, 0);
       assert.equal(document.activeElement, button, "Esc returns focus to the copy button");
-      scope.dispose();
-      button.remove();
-      host.remove();
     });
   }
 });
 
-test("copy button: the fallback close button returns focus; a later success hides the fallback", async () => {
+test("copy button: the fallback close button returns focus; a later success hides the fallback", async (t) => {
   let fail = true;
   const written = [];
   const navigator = {
@@ -234,10 +251,10 @@ test("copy button: the fallback close button returns focus; a later success hide
     },
   };
   await withNavigator(navigator, async () => {
-    const scope = createScope();
+    const scope = testScope(t); // also clears the 2 s reset timer of the successful copy
     const host = createFallbackHost();
     const button = createCopyButton({ variant: "text", value: "-426 72 300", scope, fallbackHost: host });
-    document.body.append(button, host);
+    mount(t, button, host);
     const label = () => button.find((el) => el.classList.contains("pc-copy__label")).textContent;
     assert.equal(label(), en["card.copy"]);
 
@@ -255,20 +272,17 @@ test("copy button: the fallback close button returns focus; a later success hide
     assert.equal(host.hidden, true, "a successful copy hides the fallback");
     assert.equal(button.dataset.state, "copied");
     assert.equal(label(), en["card.copied"]);
-    scope.dispose(); // clears the 2 s reset timer
-    button.remove();
-    host.remove();
   });
 });
 
 // Pinned world spawn card (30) and the seed in the world info panel (1)
 
-test("pinned spawn card: coordinates from world.spawn, copy text and a menu with only Request edit", async () => {
+test("pinned spawn card: coordinates from world.spawn, copy text and a menu with only Request edit", async (t) => {
   const world = createDataset().worlds.worlds[0];
-  const scope = createScope();
+  const scope = testScope(t);
   const opened = [];
   const section = renderSpawnCard(world, "overworld", { scope, onRequestSpawn: (opener) => opened.push(opener) });
-  document.body.append(section);
+  mount(t, section);
   assert.equal(section.getAttribute("aria-label"), en["pin.region"]);
   assert.equal(section.find((el) => el.tagName === "H3").textContent, en["world.spawn"]);
   assert.deepEqual(section.findAll((el) => el.tagName === "DD").map((el) => el.textContent), ["7", "103", "5"]);
@@ -285,25 +299,20 @@ test("pinned spawn card: coordinates from world.spawn, copy text and a menu with
 
   await withNavigator({}, async () => {
     await section.find((el) => el.classList.contains("pc-pinned__copy")).click();
-    assert.equal(section.find(isInput).value, formatCopyText(world.spawn));
+    assert.equal(section.find(isInput).value, "7 103 5");
   });
   assert.equal(renderSpawnCard(world, "the_nether", { scope, onRequestSpawn: () => {} }), null);
-  scope.dispose();
-  section.remove();
 });
 
-test("world info: int64 seeds are shown and copied exactly as stored", async () => {
+test("world info: int64 seeds are shown and copied exactly as stored", async (t) => {
   for (const seed of ["652938494491123000", "9223372036854775807", "-9223372036854775808"]) {
     const world = { ...createDataset().worlds.worlds[0], seed };
-    const scope = createScope();
-    const panel = renderWorldInfo(world, { scope });
-    document.body.append(panel);
+    const panel = renderWorldInfo(world, { scope: testScope(t) });
+    mount(t, panel);
     assert.equal(panel.find((el) => el.classList.contains("pc-worldinfo__seed")).textContent, seed);
     await withNavigator({}, async () => {
       await panel.find((el) => el.getAttribute("aria-label") === en["world.seed.copy"]).click();
       assert.equal(panel.find(isInput).value, seed);
     });
-    scope.dispose();
-    panel.remove();
   }
 });

@@ -1,6 +1,22 @@
 // Minimal DOM stand-in for UI modules in Node, grown from the FakeElement of error-page.test.mjs:
 // a tree with parentNode, attributes, dataset, classList, text, bubbling listeners and focus tracking.
+// Browser rules kept on purpose: a listener is identified by (type, fn, capture), so removing it with the
+// wrong capture flag leaves it attached; focus() does nothing on an element that is detached or inside a
+// hidden subtree; a focused element that leaves the tree hands activeElement back to body.
 // There is no layout: getBoundingClientRect returns a zero rectangle, so positioning is not testable here.
+
+const captureOf = (options) => (typeof options === "boolean" ? options : Boolean(options?.capture));
+
+function addListener(map, type, fn, options) {
+  const capture = captureOf(options);
+  const list = map.get(type) ?? [];
+  if (!list.some((l) => l.fn === fn && l.capture === capture)) map.set(type, [...list, { fn, capture }]);
+}
+
+function removeListener(map, type, fn, options) {
+  const capture = captureOf(options);
+  map.set(type, (map.get(type) ?? []).filter((l) => !(l.fn === fn && l.capture === capture)));
+}
 
 export class FakeText {
   constructor(text) {
@@ -61,11 +77,11 @@ export class FakeElement {
   removeAttribute(name) {
     this.attributes.delete(name);
   }
-  addEventListener(type, fn) {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
+  addEventListener(type, fn, options) {
+    addListener(this.listeners, type, fn, options);
   }
-  removeEventListener(type, fn) {
-    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((f) => f !== fn));
+  removeEventListener(type, fn, options) {
+    removeListener(this.listeners, type, fn, options);
   }
   detachChildren() {
     for (const child of this.children) child.parentNode = null;
@@ -100,8 +116,15 @@ export class FakeElement {
     for (let n = node; n; n = n.parentNode) if (n === this) return true;
     return false;
   }
+  /** True when this element or an ancestor has the hidden attribute (not rendered). */
+  get inHiddenTree() {
+    for (let node = this; node; node = node.parentNode) if (node.hidden) return true;
+    return false;
+  }
+  /** Like a browser: a detached or hidden element cannot take focus, and the call is silently ignored. */
   focus() {
-    this.ownerDocument.activeElement = this;
+    if (!this.isConnected || this.inHiddenTree) return;
+    this.ownerDocument.setFocused(this);
   }
   select() {
     this.selected = true;
@@ -129,7 +152,7 @@ export class FakeElement {
     };
     const results = [];
     for (let node = this; node && !stopped; node = node.parentNode) {
-      for (const fn of node.listeners?.get(type) ?? []) results.push(fn(event));
+      for (const { fn } of node.listeners?.get(type) ?? []) results.push(fn(event));
     }
     return results;
   }
@@ -154,21 +177,27 @@ export class FakeElement {
 /** Fake document with body, activeElement and document-level listeners (for outside clicks). */
 export function createFakeDocument({ baseURI = "https://example.test/site/" } = {}) {
   const listeners = new Map();
+  let focused = null;
   const doc = {
     baseURI,
-    activeElement: null,
+    /** The focused element while it is still in the tree, otherwise body (as after removing it). */
+    get activeElement() {
+      return focused?.isConnected ? focused : doc.body;
+    },
+    setFocused(el) {
+      focused = el;
+    },
     createElement: (tag) => new FakeElement(tag, doc),
     createTextNode: (text) => new FakeText(text),
-    addEventListener: (type, fn) => listeners.set(type, [...(listeners.get(type) ?? []), fn]),
-    removeEventListener: (type, fn) => listeners.set(type, (listeners.get(type) ?? []).filter((f) => f !== fn)),
+    addEventListener: (type, fn, options) => addListener(listeners, type, fn, options),
+    removeEventListener: (type, fn, options) => removeListener(listeners, type, fn, options),
     listenerCount: (type) => (listeners.get(type) ?? []).length,
     /** A pointerdown anywhere on the page, delivered to the document-level listeners. */
     pointerDown(target) {
-      for (const fn of listeners.get("pointerdown") ?? []) fn({ type: "pointerdown", target });
+      for (const { fn } of listeners.get("pointerdown") ?? []) fn({ type: "pointerdown", target });
     },
   };
   doc.body = new FakeElement("body", doc);
-  doc.activeElement = doc.body;
   return doc;
 }
 

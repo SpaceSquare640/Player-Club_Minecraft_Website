@@ -177,7 +177,7 @@ test("40 tags serialise in tags.json order, parse back unchanged and stay within
   const state = { ...defaultState(many), tagIds: [...ids].reverse() };
   const hash = serializeHash(state, many);
   assert.equal(hash, `tags=${ids.join(",")}`);
-  assert.ok(hash.length <= MAX_HASH_LENGTH, String(hash.length));
+  assert.ok(hash.length <= 2048, String(hash.length));
   const parsed = parseHash(`#${hash}`, many);
   assert.deepEqual(parsed.dropped, []);
   assert.deepEqual(parsed.state.tagIds, ids);
@@ -185,19 +185,20 @@ test("40 tags serialise in tags.json order, parse back unchanged and stay within
 });
 
 test("many long tags: a hash of exactly 2048 characters is read, one character more falls back to defaults", () => {
+  assert.equal(MAX_HASH_LENGTH, 2048, "the documented limit");
   const { many, ids } = withManyTags(61);
   const tagsOnly = serializeHash({ ...defaultState(many), tagIds: ids }, many);
-  const pad = MAX_HASH_LENGTH - tagsOnly.length - "q=&".length;
+  const pad = 2048 - tagsOnly.length - "q=&".length;
   assert.ok(pad >= 1 && pad < 100, String(pad));
   const atLimit = serializeHash({ ...defaultState(many), tagIds: ids, query: "a".repeat(pad) }, many);
-  assert.equal(atLimit.length, MAX_HASH_LENGTH);
+  assert.equal(atLimit.length, 2048);
   const read = parseHash(`#${atLimit}`, many);
   assert.deepEqual(read.dropped, []);
   assert.deepEqual(read.state.tagIds, ids);
   assert.equal(read.state.query.length, pad);
 
   const over = serializeHash({ ...defaultState(many), tagIds: ids, query: "a".repeat(pad + 1) }, many);
-  assert.equal(over.length, MAX_HASH_LENGTH + 1);
+  assert.equal(over.length, 2049);
   const fallback = parseHash(`#${over}`, many);
   assert.deepEqual(fallback.state, defaultState(many));
   assert.deepEqual(reasons(fallback.dropped), ["*:tooLong"]);

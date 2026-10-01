@@ -53,10 +53,17 @@ test("buildSpawnCard: only on the Overworld tab, generated from world.spawn", ()
 
 test("buildSpawnCard: coordinates and copy text equal formatCopyText(world.spawn)", () => {
   const [world] = createHashContext().worlds;
-  for (const spawn of [world.spawn, { x: -30000000, y: -64, z: 30000000 }, { x: 0, y: 320, z: -1 }, { x: 12, y: null, z: -34 }]) {
+  const cases = [
+    [world.spawn, "7 103 5"],
+    [{ x: -30000000, y: -64, z: 30000000 }, "-30000000 -64 30000000"],
+    [{ x: 0, y: 320, z: -1 }, "0 320 -1"],
+    [{ x: 12, y: null, z: -34 }, "12 -34"],
+  ];
+  for (const [spawn, expected] of cases) {
     const card = buildSpawnCard({ ...world, spawn }, "overworld");
-    assert.equal(card.copyText, formatCopyText(spawn), JSON.stringify(spawn));
-    assert.equal(formatCopyText(card), formatCopyText(spawn), "the card shows the same values it copies");
+    assert.equal(formatCopyText(spawn), expected);
+    assert.equal(card.copyText, expected, JSON.stringify(spawn));
+    assert.deepEqual([card.x, card.y, card.z], [spawn.x, spawn.y, spawn.z], "the card shows the values it copies");
   }
 });
 

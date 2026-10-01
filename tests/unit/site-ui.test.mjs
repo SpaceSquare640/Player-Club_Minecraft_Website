@@ -137,9 +137,14 @@ test("CSS: token colour pairs of the design contrast table meet WCAG AA", () => 
     ["color-text-muted", "color-surface-raised", TEXT],
     ["color-primary", "color-bg", TEXT],
     ["color-primary", "color-surface", TEXT],
+    ["color-primary-active", "color-bg", TEXT], // text button while pressed
+    ["color-primary-active", "color-surface", TEXT],
     ["color-secondary", "color-bg", TEXT],
     ["color-secondary", "color-surface", TEXT],
     ["color-secondary", "tint-secondary", TEXT],
+    ["color-secondary-hover", "color-bg", TEXT], // community link / button on hover
+    ["color-secondary-hover", "color-surface", TEXT],
+    ["color-secondary-hover", "tint-secondary", TEXT],
     ["color-success", "color-bg", TEXT],
     ["color-success", "color-surface", TEXT],
     ["color-danger", "color-bg", TEXT],
@@ -149,7 +154,19 @@ test("CSS: token colour pairs of the design contrast table meet WCAG AA", () => 
     ["color-text-on-accent", "color-primary-active", TEXT],
     ["color-border-strong", "color-bg", NON_TEXT],
     ["color-border-strong", "color-surface", NON_TEXT],
+    ["color-focus", "color-bg", NON_TEXT], // focus outline
+    ["color-focus", "color-surface", NON_TEXT],
   ];
+  // Every token the CSS uses as a text colour has a pair above (disabled controls are exempt), so a new
+  // text colour such as primary-hover cannot slip in unchecked.
+  const textPairs = new Set(pairs.filter(([, , min]) => min === TEXT).map(([fg]) => fg));
+  const unchecked = new Set();
+  for (const text of Object.values(css)) {
+    for (const m of text.matchAll(/(?:^|[^-\w])color\s*:\s*var\(--pc-(color-[a-z0-9-]+)\)/g)) {
+      if (m[1] !== "color-text-disabled" && !textPairs.has(m[1])) unchecked.add(m[1]);
+    }
+  }
+  assert.deepEqual([...unchecked], [], "text colours without a contrast pair");
   const failing = [];
   for (const [fg, back, min] of pairs) {
     const ratio = contrast(color(fg), color(back));
@@ -207,9 +224,11 @@ test("Discord links: accessible names come from dictionary keys present in en an
   }
   assert.match(en[ariaKey], /Discord.*\(opens in a new tab\)$/);
   assert.match(zh[ariaKey], /Discord.*（在新分頁開啟）$/);
+  // app.js (not importable in Node) walks every [data-i18n-attr] element, splits "attr:key" pairs and sets
+  // each attribute from t(); the patterns tolerate formatting and naming changes.
   const app = jsSources.find(({ file }) => file.endsWith(path.join("js", "app.js"))).source;
-  assert.match(app, /querySelectorAll\("\[data-i18n-attr\]"\)\) \{[\s\S]*?el\.setAttribute\(attr\.trim\(\), t\(key\.trim\(\)\)\);/);
-  assert.match(app, /discord: \$\("pc-discord"\),\s*footerDiscord: \$\("pc-footer-discord"\),/);
+  assert.match(app, /querySelectorAll\(\s*(["'`])\[data-i18n-attr\]\1\s*\)[\s\S]*?\.split\(\s*(["'`]);\2\s*\)[\s\S]*?\.setAttribute\([^;]*?\bt\(/);
+  for (const id of ["pc-discord", "pc-footer-discord"]) assert.match(app, new RegExp(`(["'\`])${id}\\1`), id);
 });
 
 test("prefersReducedMotion follows matchMedia and is false when matchMedia is missing", () => {
