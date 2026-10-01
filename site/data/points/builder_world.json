@@ -13,6 +13,19 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-09-29T15:04:32Z",
       "updatedAt": "2026-09-29T15:04:32Z"
+    },
+    {
+      "id": "p0006",
+      "dimension": "overworld",
+      "name": "鐵人塔",
+      "tags": ["other"],
+      "x": -8,
+      "y": 56,
+      "z": 216,
+      "note": "有自帶倉庫: -8 49 216",
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-01T10:06:11Z",
+      "updatedAt": "2026-10-01T10:06:11Z"
     }
   ]
 }

@@ -211,6 +211,30 @@
         "type": "issue",
         "issue": 11
       }
+    },
+    {
+      "id": "c0010",
+      "date": "2026-10-01",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0006",
+        "dimension": "overworld",
+        "name": "鐵人塔"
+      },
+      "summary": {
+        "en": "Added point: 鐵人塔",
+        "zh-TW": "新增座標：鐵人塔"
+      },
+      "scope": {
+        "en": "Point data: Builder World / Overworld",
+        "zh-TW": "座標資料：Builder World／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 13
+      }
     }
   ]
 }
