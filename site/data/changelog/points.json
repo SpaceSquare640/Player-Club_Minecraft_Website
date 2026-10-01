@@ -283,6 +283,30 @@
         "type": "issue",
         "issue": 15
       }
+    },
+    {
+      "id": "c0013",
+      "date": "2026-10-01",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0008",
+        "dimension": "overworld",
+        "name": "67 速單區塊熔爐組"
+      },
+      "summary": {
+        "en": "Added point: 67 速單區塊熔爐組",
+        "zh-TW": "新增座標：67 速單區塊熔爐組"
+      },
+      "scope": {
+        "en": "Point data: Builder World / Overworld",
+        "zh-TW": "座標資料：Builder World／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 14
+      }
     }
   ]
 }

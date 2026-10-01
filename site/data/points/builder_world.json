@@ -26,6 +26,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-01T10:06:11Z",
       "updatedAt": "2026-10-01T10:06:11Z"
+    },
+    {
+      "id": "p0008",
+      "dimension": "overworld",
+      "name": "67 速單區塊熔爐組",
+      "tags": ["other"],
+      "x": 373,
+      "y": 56,
+      "z": 150,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-01T10:35:03Z",
+      "updatedAt": "2026-10-01T10:35:03Z"
     }
   ]
 }
