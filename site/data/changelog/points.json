@@ -163,6 +163,30 @@
         "type": "issue",
         "issue": 8
       }
+    },
+    {
+      "id": "c0008",
+      "date": "2026-10-01",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0005",
+        "dimension": "overworld",
+        "name": "Smoke Test 1"
+      },
+      "summary": {
+        "en": "Added point: Smoke Test 1",
+        "zh-TW": "新增座標：Smoke Test 1"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 9
+      }
     }
   ]
 }
