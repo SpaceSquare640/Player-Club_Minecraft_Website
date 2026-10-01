@@ -141,6 +141,28 @@
         "type": "issue",
         "issue": 6
       }
+    },
+    {
+      "id": "c0007",
+      "date": "2026-10-01",
+      "action": "edit",
+      "target": {
+        "type": "spawn",
+        "worldId": "player_club"
+      },
+      "changedFields": ["x", "y", "z"],
+      "summary": {
+        "en": "Updated world spawn: Player_Club",
+        "zh-TW": "修改世界出生座標：Player_Club"
+      },
+      "scope": {
+        "en": "World spawn: Player_Club / Overworld",
+        "zh-TW": "世界出生座標：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 8
+      }
     }
   ]
 }

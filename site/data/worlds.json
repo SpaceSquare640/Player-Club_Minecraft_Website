@@ -8,9 +8,9 @@
       "gameVersion": "latest",
       "seed": "652938494491123000",
       "spawn": {
-        "x": 7,
-        "y": 103,
-        "z": 5
+        "x": -64,
+        "y": 88,
+        "z": -6
       },
       "dimensions": ["overworld", "the_nether", "the_end"]
     },
