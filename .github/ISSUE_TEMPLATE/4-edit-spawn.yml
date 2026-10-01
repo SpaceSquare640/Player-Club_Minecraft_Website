@@ -42,7 +42,7 @@ body:
     id: "reason"
     attributes:
       label: "Reason (optional) / 原因（選填）"
-      description: "Not saved to the data. / 不會寫入資料。"
+      description: "Not saved to the data (smoke test). / 不會寫入資料（冒煙測試）。"
   - type: "checkboxes"
     id: "confirm"
     attributes:
