@@ -37,19 +37,6 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-09-29T10:45:03Z",
       "updatedAt": "2026-09-29T10:45:03Z"
-    },
-    {
-      "id": "p0005",
-      "dimension": "overworld",
-      "name": "Smoke Test 1",
-      "tags": ["other"],
-      "x": 1000,
-      "y": 64,
-      "z": -1001,
-      "note": "Temporary smoke test point; it will be removed after the test. / 暫時的冒煙測試座標，測試後刪除。",
-      "submittedBy": "s22054",
-      "createdAt": "2026-10-01T08:26:36Z",
-      "updatedAt": "2026-10-01T08:26:36Z"
     }
   ]
 }

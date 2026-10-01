@@ -187,6 +187,30 @@
         "type": "issue",
         "issue": 9
       }
+    },
+    {
+      "id": "c0009",
+      "date": "2026-10-01",
+      "action": "delete",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0005",
+        "dimension": "overworld",
+        "name": "Smoke Test 1"
+      },
+      "summary": {
+        "en": "Removed point: Smoke Test 1",
+        "zh-TW": "刪除座標：Smoke Test 1"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 11
+      }
     }
   ]
 }
