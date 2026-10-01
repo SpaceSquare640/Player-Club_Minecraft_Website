@@ -307,6 +307,30 @@
         "type": "issue",
         "issue": 14
       }
+    },
+    {
+      "id": "c0014",
+      "date": "2026-10-01",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0009",
+        "dimension": "overworld",
+        "name": "終界傳送門"
+      },
+      "summary": {
+        "en": "Added point: 終界傳送門",
+        "zh-TW": "新增座標：終界傳送門"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 16
+      }
     }
   ]
 }

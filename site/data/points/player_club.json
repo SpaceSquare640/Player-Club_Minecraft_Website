@@ -37,6 +37,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-09-29T10:45:03Z",
       "updatedAt": "2026-09-29T10:45:03Z"
+    },
+    {
+      "id": "p0009",
+      "dimension": "overworld",
+      "name": "終界傳送門",
+      "tags": ["end_portal"],
+      "x": 968,
+      "y": -26,
+      "z": 1484,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-01T15:18:45Z",
+      "updatedAt": "2026-10-01T15:18:45Z"
     }
   ]
 }
