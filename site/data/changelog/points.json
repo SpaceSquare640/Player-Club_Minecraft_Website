@@ -572,6 +572,30 @@
         "type": "issue",
         "issue": 26
       }
+    },
+    {
+      "id": "c0025",
+      "date": "2026-10-03",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0019",
+        "dimension": "the_end",
+        "name": "End City / 終界城 4"
+      },
+      "summary": {
+        "en": "Added point: End City / 終界城 4",
+        "zh-TW": "新增座標：End City / 終界城 4"
+      },
+      "scope": {
+        "en": "Point data: Builder World / The End",
+        "zh-TW": "座標資料：Builder World／終界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 27
+      }
     }
   ]
 }
