@@ -122,6 +122,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-02T15:54:47Z",
       "updatedAt": "2026-10-02T15:54:47Z"
+    },
+    {
+      "id": "p0016",
+      "dimension": "the_end",
+      "name": "End City / 終界城 1",
+      "tags": ["end_city"],
+      "x": 1024,
+      "y": 61,
+      "z": -542,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-02T16:11:06Z",
+      "updatedAt": "2026-10-02T16:11:06Z"
     }
   ]
 }
