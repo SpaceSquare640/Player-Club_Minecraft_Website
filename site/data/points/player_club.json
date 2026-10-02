@@ -76,7 +76,7 @@
     },
     {
       "id": "p0012",
-      "dimension": "the_nether",
+      "dimension": "overworld",
       "name": "DRYER's Base",
       "tags": ["base"],
       "x": -294,
@@ -84,7 +84,7 @@
       "z": 340,
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-02T06:20:41Z",
-      "updatedAt": "2026-10-02T06:20:41Z"
+      "updatedAt": "2026-10-02T09:22:32Z"
     }
   ]
 }

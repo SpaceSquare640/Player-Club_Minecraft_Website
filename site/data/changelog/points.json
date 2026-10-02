@@ -403,6 +403,31 @@
         "type": "issue",
         "issue": 19
       }
+    },
+    {
+      "id": "c0018",
+      "date": "2026-10-02",
+      "action": "edit",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0012",
+        "dimension": "overworld",
+        "name": "DRYER's Base"
+      },
+      "changedFields": ["dimension"],
+      "summary": {
+        "en": "Updated point: DRYER's Base (dimension)",
+        "zh-TW": "修改座標：DRYER's Base（維度）"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 20
+      }
     }
   ]
 }
