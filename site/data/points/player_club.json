@@ -147,6 +147,19 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-02T16:33:08Z",
       "updatedAt": "2026-10-02T16:33:08Z"
+    },
+    {
+      "id": "p0018",
+      "dimension": "the_end",
+      "name": "End City / 終界城 3",
+      "tags": ["end_city"],
+      "x": 83,
+      "y": 61,
+      "z": -1538,
+      "note": "已探索",
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-02T16:35:01Z",
+      "updatedAt": "2026-10-02T16:35:01Z"
     }
   ]
 }
