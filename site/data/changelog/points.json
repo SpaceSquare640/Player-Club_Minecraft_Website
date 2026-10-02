@@ -452,6 +452,30 @@
         "type": "issue",
         "issue": 21
       }
+    },
+    {
+      "id": "c0020",
+      "date": "2026-10-02",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0014",
+        "dimension": "the_end",
+        "name": "折躍門"
+      },
+      "summary": {
+        "en": "Added point: 折躍門",
+        "zh-TW": "新增座標：折躍門"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / The End",
+        "zh-TW": "座標資料：Player_Club／終界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 23
+      }
     }
   ]
 }
