@@ -379,6 +379,30 @@
         "type": "issue",
         "issue": 18
       }
+    },
+    {
+      "id": "c0017",
+      "date": "2026-10-02",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0012",
+        "dimension": "the_nether",
+        "name": "DRYER's Base"
+      },
+      "summary": {
+        "en": "Added point: DRYER's Base",
+        "zh-TW": "新增座標：DRYER's Base"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / The Nether",
+        "zh-TW": "座標資料：Player_Club／地獄"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 19
+      }
     }
   ]
 }
