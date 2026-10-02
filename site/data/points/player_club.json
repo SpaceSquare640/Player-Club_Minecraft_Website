@@ -85,6 +85,19 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-02T06:20:41Z",
       "updatedAt": "2026-10-02T09:22:32Z"
+    },
+    {
+      "id": "p0013",
+      "dimension": "overworld",
+      "name": "Village 2",
+      "tags": ["village"],
+      "x": -385,
+      "y": 63,
+      "z": -140,
+      "note": "Savana Village",
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-02T15:06:42Z",
+      "updatedAt": "2026-10-02T15:06:42Z"
     }
   ]
 }

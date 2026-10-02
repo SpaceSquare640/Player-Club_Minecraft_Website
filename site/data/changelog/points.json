@@ -428,6 +428,30 @@
         "type": "issue",
         "issue": 20
       }
+    },
+    {
+      "id": "c0019",
+      "date": "2026-10-02",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0013",
+        "dimension": "overworld",
+        "name": "Village 2"
+      },
+      "summary": {
+        "en": "Added point: Village 2",
+        "zh-TW": "新增座標：Village 2"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 21
+      }
     }
   ]
 }
