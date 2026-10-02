@@ -524,6 +524,30 @@
         "type": "issue",
         "issue": 24
       }
+    },
+    {
+      "id": "c0023",
+      "date": "2026-10-03",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0017",
+        "dimension": "the_end",
+        "name": "End City / 終界城 2"
+      },
+      "summary": {
+        "en": "Added point: End City / 終界城 2",
+        "zh-TW": "新增座標：End City / 終界城 2"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / The End",
+        "zh-TW": "座標資料：Player_Club／終界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 25
+      }
     }
   ]
 }

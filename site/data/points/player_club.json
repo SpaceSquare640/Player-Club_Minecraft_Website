@@ -134,6 +134,19 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-02T16:11:06Z",
       "updatedAt": "2026-10-02T16:11:06Z"
+    },
+    {
+      "id": "p0017",
+      "dimension": "the_end",
+      "name": "End City / 終界城 2",
+      "tags": ["end_city"],
+      "x": 403,
+      "y": 61,
+      "z": -1523,
+      "note": "已探索",
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-02T16:33:08Z",
+      "updatedAt": "2026-10-02T16:33:08Z"
     }
   ]
 }
