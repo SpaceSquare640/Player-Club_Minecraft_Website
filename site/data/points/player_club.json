@@ -245,6 +245,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-03T04:17:01Z",
       "updatedAt": "2026-10-03T04:17:01Z"
+    },
+    {
+      "id": "p0027",
+      "dimension": "the_nether",
+      "name": "Bastion Remnant | 堡壘遺跡",
+      "tags": ["bastion"],
+      "x": 616,
+      "y": 65,
+      "z": -122,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-03T04:18:29Z",
+      "updatedAt": "2026-10-03T04:18:29Z"
     }
   ]
 }

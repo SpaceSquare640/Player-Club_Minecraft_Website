@@ -764,6 +764,30 @@
         "type": "issue",
         "issue": 34
       }
+    },
+    {
+      "id": "c0033",
+      "date": "2026-10-03",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0027",
+        "dimension": "the_nether",
+        "name": "Bastion Remnant | 堡壘遺跡"
+      },
+      "summary": {
+        "en": "Added point: Bastion Remnant | 堡壘遺跡",
+        "zh-TW": "新增座標：Bastion Remnant | 堡壘遺跡"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / The Nether",
+        "zh-TW": "座標資料：Player_Club／地獄"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 35
+      }
     }
   ]
 }
