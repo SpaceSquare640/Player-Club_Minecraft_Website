@@ -788,6 +788,30 @@
         "type": "issue",
         "issue": 35
       }
+    },
+    {
+      "id": "c0034",
+      "date": "2026-10-03",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0028",
+        "dimension": "overworld",
+        "name": "Swamp | 沼澤地"
+      },
+      "summary": {
+        "en": "Added point: Swamp | 沼澤地",
+        "zh-TW": "新增座標：Swamp | 沼澤地"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 36
+      }
     }
   ]
 }

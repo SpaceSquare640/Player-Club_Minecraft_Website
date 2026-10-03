@@ -257,6 +257,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-03T04:18:29Z",
       "updatedAt": "2026-10-03T04:18:29Z"
+    },
+    {
+      "id": "p0028",
+      "dimension": "overworld",
+      "name": "Swamp | 沼澤地",
+      "tags": ["biome"],
+      "x": -36,
+      "y": 65,
+      "z": 2520,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-03T13:38:35Z",
+      "updatedAt": "2026-10-03T13:38:35Z"
     }
   ]
 }
