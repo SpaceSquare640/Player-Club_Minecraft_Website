@@ -220,6 +220,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-03T03:54:29Z",
       "updatedAt": "2026-10-03T03:54:29Z"
+    },
+    {
+      "id": "p0025",
+      "dimension": "overworld",
+      "name": "Village 6",
+      "tags": ["village"],
+      "x": 4394,
+      "y": 65,
+      "z": -7844,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-03T03:57:54Z",
+      "updatedAt": "2026-10-03T03:57:54Z"
     }
   ]
 }
