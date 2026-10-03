@@ -740,6 +740,30 @@
         "type": "issue",
         "issue": 33
       }
+    },
+    {
+      "id": "c0032",
+      "date": "2026-10-03",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0026",
+        "dimension": "the_nether",
+        "name": "Nether Portal / 地獄傳送門"
+      },
+      "summary": {
+        "en": "Added point: Nether Portal / 地獄傳送門",
+        "zh-TW": "新增座標：Nether Portal / 地獄傳送門"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / The Nether",
+        "zh-TW": "座標資料：Player_Club／地獄"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 34
+      }
     }
   ]
 }

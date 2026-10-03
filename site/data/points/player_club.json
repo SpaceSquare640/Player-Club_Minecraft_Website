@@ -232,6 +232,19 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-03T03:57:54Z",
       "updatedAt": "2026-10-03T03:57:54Z"
+    },
+    {
+      "id": "p0026",
+      "dimension": "the_nether",
+      "name": "Nether Portal / 地獄傳送門",
+      "tags": ["nether_portal"],
+      "x": 632,
+      "y": 71,
+      "z": -1003,
+      "note": "主世界：4995 80 -7939",
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-03T04:17:01Z",
+      "updatedAt": "2026-10-03T04:17:01Z"
     }
   ]
 }
