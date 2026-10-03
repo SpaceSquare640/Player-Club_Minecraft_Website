@@ -692,6 +692,30 @@
         "type": "issue",
         "issue": 31
       }
+    },
+    {
+      "id": "c0030",
+      "date": "2026-10-03",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0024",
+        "dimension": "overworld",
+        "name": "Pillager Outpost | 掠奪者前哨站 1"
+      },
+      "summary": {
+        "en": "Added point: Pillager Outpost | 掠奪者前哨站 1",
+        "zh-TW": "新增座標：Pillager Outpost | 掠奪者前哨站 1"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 32
+      }
     }
   ]
 }

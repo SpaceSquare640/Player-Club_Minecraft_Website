@@ -208,6 +208,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-03T03:52:35Z",
       "updatedAt": "2026-10-03T03:52:35Z"
+    },
+    {
+      "id": "p0024",
+      "dimension": "overworld",
+      "name": "Pillager Outpost | 掠奪者前哨站 1",
+      "tags": ["other"],
+      "x": 3944,
+      "y": 108,
+      "z": -7465,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-03T03:54:29Z",
+      "updatedAt": "2026-10-03T03:54:29Z"
     }
   ]
 }
