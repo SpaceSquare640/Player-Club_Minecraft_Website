@@ -184,6 +184,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-03T03:44:51Z",
       "updatedAt": "2026-10-03T03:44:51Z"
+    },
+    {
+      "id": "p0022",
+      "dimension": "overworld",
+      "name": "Village 5",
+      "tags": ["village"],
+      "x": 780,
+      "y": 65,
+      "z": -6314,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-03T03:46:32Z",
+      "updatedAt": "2026-10-03T03:46:32Z"
     }
   ]
 }
