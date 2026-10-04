@@ -38,6 +38,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-01T10:35:03Z",
       "updatedAt": "2026-10-01T10:35:03Z"
+    },
+    {
+      "id": "p0030",
+      "dimension": "overworld",
+      "name": "半自動農田",
+      "tags": ["farm"],
+      "x": 195,
+      "y": 56,
+      "z": 143,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-04T04:10:06Z",
+      "updatedAt": "2026-10-04T04:10:06Z"
     }
   ]
 }

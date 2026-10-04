@@ -860,6 +860,30 @@
         "type": "issue",
         "issue": 38
       }
+    },
+    {
+      "id": "c0037",
+      "date": "2026-10-04",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0030",
+        "dimension": "overworld",
+        "name": "半自動農田"
+      },
+      "summary": {
+        "en": "Added point: 半自動農田",
+        "zh-TW": "新增座標：半自動農田"
+      },
+      "scope": {
+        "en": "Point data: Builder World / Overworld",
+        "zh-TW": "座標資料：Builder World／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 39
+      }
     }
   ]
 }
