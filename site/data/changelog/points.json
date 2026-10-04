@@ -836,6 +836,30 @@
         "type": "issue",
         "issue": 37
       }
+    },
+    {
+      "id": "c0036",
+      "date": "2026-10-04",
+      "action": "delete",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0019",
+        "dimension": "the_end",
+        "name": "End City / 終界城 4"
+      },
+      "summary": {
+        "en": "Removed point: End City / 終界城 4",
+        "zh-TW": "刪除座標：End City / 終界城 4"
+      },
+      "scope": {
+        "en": "Point data: Builder World / The End",
+        "zh-TW": "座標資料：Builder World／終界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 38
+      }
     }
   ]
 }

@@ -38,19 +38,6 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-01T10:35:03Z",
       "updatedAt": "2026-10-01T10:35:03Z"
-    },
-    {
-      "id": "p0019",
-      "dimension": "the_end",
-      "name": "End City / 終界城 4",
-      "tags": ["end_city"],
-      "x": -1218,
-      "y": 65,
-      "z": -1220,
-      "note": "已探索",
-      "submittedBy": "SpaceSquare640",
-      "createdAt": "2026-10-02T17:01:30Z",
-      "updatedAt": "2026-10-02T17:01:30Z"
     }
   ]
 }
