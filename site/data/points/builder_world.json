@@ -50,6 +50,19 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-04T04:10:06Z",
       "updatedAt": "2026-10-04T04:10:06Z"
+    },
+    {
+      "id": "p0031",
+      "dimension": "overworld",
+      "name": "全自動農田",
+      "tags": ["farm"],
+      "x": 232,
+      "y": 56,
+      "z": 174,
+      "note": "[材民農田]",
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-04T04:11:49Z",
+      "updatedAt": "2026-10-04T04:11:49Z"
     }
   ]
 }
