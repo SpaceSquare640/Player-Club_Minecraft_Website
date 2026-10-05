@@ -63,6 +63,18 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-04T04:11:49Z",
       "updatedAt": "2026-10-04T04:11:49Z"
+    },
+    {
+      "id": "p0032",
+      "dimension": "overworld",
+      "name": "炸石機",
+      "tags": ["other"],
+      "x": 158,
+      "y": 57,
+      "z": 67,
+      "submittedBy": "SpaceSquare640",
+      "createdAt": "2026-10-05T12:10:40Z",
+      "updatedAt": "2026-10-05T12:10:40Z"
     }
   ]
 }

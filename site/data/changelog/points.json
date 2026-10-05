@@ -908,6 +908,30 @@
         "type": "issue",
         "issue": 40
       }
+    },
+    {
+      "id": "c0039",
+      "date": "2026-10-05",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "builder_world",
+        "id": "p0032",
+        "dimension": "overworld",
+        "name": "炸石機"
+      },
+      "summary": {
+        "en": "Added point: 炸石機",
+        "zh-TW": "新增座標：炸石機"
+      },
+      "scope": {
+        "en": "Point data: Builder World / Overworld",
+        "zh-TW": "座標資料：Builder World／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 41
+      }
     }
   ]
 }
