@@ -22,10 +22,12 @@ export const CORE_FILES = [
   { key: "changes", path: "site/data/changelog/points.json", schema: "changelog-points" },
 ];
 export const POINTS_DIR = "site/data/points";
+export const COMMANDS_DIR = "site/data/commands";
 export const I18N_DIR = "site/i18n";
 
 export const pathOf = (key) => CORE_FILES.find((f) => f.key === key).path;
 export const pointsPath = (worldId) => `${POINTS_DIR}/${worldId}.json`;
+export const commandsPath = (worldId) => `${COMMANDS_DIR}/${worldId}.json`;
 export const i18nPath = (lang) => `${I18N_DIR}/${lang}.json`;
 
 /** Reader over the working tree rooted at root. read/list return null when missing. */
@@ -75,11 +77,12 @@ async function readJson(reader, relPath, issues, { required }) {
  * Loads the data set. Missing or unparsable files are reported as FILE issues and left undefined.
  * @returns {Promise<{ dataset: object, issues: object[] }>}
  *   dataset: { manifest, config, editions, worlds, tags, vpn, updates, changes,
- *              points: { [fileStem]: data }, i18n: null | { en?, "zh-TW"? } }
+ *              points: { [fileStem]: data }, commands: { [fileStem]: data }, i18n: null | { en?, "zh-TW"? } }
+ *   A missing commands directory means no world has commands.
  */
 export async function loadDataset(reader) {
   const issues = [];
-  const dataset = { points: {}, i18n: null };
+  const dataset = { points: {}, commands: {}, i18n: null };
   for (const file of CORE_FILES) {
     dataset[file.key] = await readJson(reader, file.path, issues, { required: true });
   }
@@ -87,6 +90,11 @@ export async function loadDataset(reader) {
   for (const name of pointFiles.filter((n) => n.endsWith(".json")).sort()) {
     const data = await readJson(reader, `${POINTS_DIR}/${name}`, issues, { required: true });
     if (data !== undefined) dataset.points[name.slice(0, -".json".length)] = data;
+  }
+  const commandFiles = (await reader.list(COMMANDS_DIR)) ?? [];
+  for (const name of commandFiles.filter((n) => n.endsWith(".json")).sort()) {
+    const data = await readJson(reader, `${COMMANDS_DIR}/${name}`, issues, { required: true });
+    if (data !== undefined) dataset.commands[name.slice(0, -".json".length)] = data;
   }
   const i18nFiles = await reader.list(I18N_DIR);
   if (i18nFiles !== null) {
@@ -107,6 +115,9 @@ export function listDataFiles(dataset) {
   }
   for (const stem of Object.keys(dataset.points ?? {}).sort()) {
     files.push({ path: pointsPath(stem), schema: "points", data: dataset.points[stem] });
+  }
+  for (const stem of Object.keys(dataset.commands ?? {}).sort()) {
+    files.push({ path: commandsPath(stem), schema: "commands", data: dataset.commands[stem] });
   }
   for (const lang of LANGS) {
     const data = dataset.i18n?.[lang];

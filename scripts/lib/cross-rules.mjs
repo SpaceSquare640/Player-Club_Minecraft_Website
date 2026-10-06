@@ -1,11 +1,13 @@
-// Cross validation rules X01-X21 and X23 (X22 is the Issue Forms check, added with the forms generator).
+// Cross validation rules X01-X21, X23 and X25 (X22 is the Issue Forms check, added with the forms generator;
+// X24 is reserved).
 // Input is a schema-valid data set (see load-data.mjs); output is a list of issues:
 // { level: "error" | "warning", code, file, path (JSON pointer), message }.
 
 import { parseId, isStandardId } from "../../site/js/lib/ids.js";
 import { compareVersion, resolveBounds } from "../../site/js/lib/version.js";
 import { isWithinBounds } from "../../site/js/lib/coords.js";
-import { CORE_FILES, I18N_DIR, LANGS, SUPPORTED_SCHEMA_VERSION, i18nPath, listDataFiles, pointsPath } from "./load-data.mjs";
+import { MAX_ENCHANTMENT_LEVEL, parseEnchantments } from "../../site/js/lib/commands.js";
+import { CORE_FILES, I18N_DIR, LANGS, SUPPORTED_SCHEMA_VERSION, commandsPath, i18nPath, listDataFiles, pointsPath } from "./load-data.mjs";
 import { findInternalTextExcept } from "./public-text-guard.mjs";
 import { addDays, dateInTimeZone } from "./dates.mjs";
 import { POINT_FIELDS, SPAWN_FIELDS } from "./changelog-templates.mjs";
@@ -255,6 +257,64 @@ export function runCrossRules(dataset, options = {}) {
     if (file.worldId !== stem) error("X05", pointsPath(stem), "/worldId", `worldId ${file.worldId} does not match the file name ${stem}`);
   }
 
+  // X25 commands files: one per world with commands: true, worldId equals file name, unique ids,
+  // valid enchantment lists, and commands of one item adjacent with the same label and distinct variants.
+  // Shapes (item, enchantments text, count, labels) are checked by the schema.
+  const commandFiles = dataset.commands ?? {};
+  for (const world of worlds.worlds) {
+    if (world.commands === true && !commandFiles[world.id]) {
+      error("X25", commandsPath(world.id), "", `World ${world.id} has commands: true but no commands file`);
+    }
+  }
+  for (const [stem, file] of Object.entries(commandFiles)) {
+    const fpath = commandsPath(stem);
+    const world = worldById.get(stem);
+    if (!world) error("X25", fpath, "", `Orphan commands file: world ${stem} does not exist`);
+    else if (world.commands !== true) error("X25", fpath, "", `World ${stem} has a commands file but no commands: true in worlds.json`);
+    if (file.worldId !== stem) error("X25", fpath, "/worldId", `worldId ${file.worldId} does not match the file name ${stem}`);
+    const seenIds = new Set();
+    const firstByItem = new Map();
+    const variantsByItem = new Map();
+    const countByItem = new Map();
+    for (const entry of file.commands) countByItem.set(entry.item, (countByItem.get(entry.item) ?? 0) + 1);
+    file.commands.forEach((entry, i) => {
+      const base = `/commands/${i}`;
+      if (seenIds.has(entry.id)) error("X25", fpath, `${base}/id`, `Duplicate command id ${entry.id}`);
+      seenIds.add(entry.id);
+
+      const seenEnchantments = new Set();
+      for (const { id: ench, level } of parseEnchantments(entry.enchantments) ?? []) {
+        const pointer = `${base}/enchantments`;
+        if (ench === "custom_name") error("X25", fpath, pointer, `${entry.id}: enchantments must not contain custom_name; the site builds the name`);
+        if (seenEnchantments.has(ench)) error("X25", fpath, pointer, `Duplicate enchantment ${ench} in ${entry.id}`);
+        seenEnchantments.add(ench);
+        if (level < 1 || level > MAX_ENCHANTMENT_LEVEL) {
+          error("X25", fpath, pointer, `Enchantment level ${level} of ${ench} in ${entry.id} is outside 1..${MAX_ENCHANTMENT_LEVEL}`);
+        }
+      }
+
+      const first = firstByItem.get(entry.item);
+      if (first === undefined) {
+        firstByItem.set(entry.item, entry);
+      } else {
+        if (file.commands[i - 1].item !== entry.item) error("X25", fpath, base, `Commands for item ${entry.item} must be adjacent (${entry.id})`);
+        if (first.label.en !== entry.label.en || first.label["zh-TW"] !== entry.label["zh-TW"]) {
+          error("X25", fpath, `${base}/label`, `${entry.id}: label must match the first ${entry.item} command`);
+        }
+      }
+      if (countByItem.get(entry.item) > 1) {
+        if (!entry.variant) {
+          error("X25", fpath, base, `${entry.id}: variant is required when ${entry.item} has more than one command`);
+        } else {
+          const seenVariants = variantsByItem.get(entry.item) ?? new Set();
+          if (seenVariants.has(entry.variant.en)) error("X25", fpath, `${base}/variant/en`, `Duplicate variant ${entry.variant.en} for ${entry.item}`);
+          seenVariants.add(entry.variant.en);
+          variantsByItem.set(entry.item, seenVariants);
+        }
+      }
+    });
+  }
+
   // X06-X10, X17 points
   const nowMs = now.getTime();
   const seenPointIds = new Map();
@@ -381,6 +441,15 @@ export function runCrossRules(dataset, options = {}) {
     const dict = dataset.i18n?.[lang];
     if (!dict) continue;
     for (const [key, value] of Object.entries(dict.messages)) guard(i18nPath(lang), `/messages/${key}`, value);
+  }
+  // Command labels and variants are the owner's own wording (item and enchantments are ids, not scanned).
+  for (const [stem, file] of Object.entries(dataset.commands ?? {})) {
+    file.commands.forEach((entry, i) => {
+      for (const field of ["label", "variant"]) {
+        if (!entry[field]) continue;
+        for (const lang of ["en", "zh-TW"]) guard(commandsPath(stem), `/commands/${i}/${field}/${lang}`, entry[field][lang]);
+      }
+    });
   }
 
   // X18 sequences never decrease

@@ -3,8 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createValidator } from "../../scripts/lib/ajv.mjs";
+import { ENCHANTMENTS_RE, ITEM_RE, MAX_COUNT, MAX_ENCHANTMENTS_LENGTH } from "../../site/js/lib/commands.js";
 import { isPlainText } from "../../site/js/lib/text.js";
-import { createDataset, createDictionaries } from "../fixtures/dataset.mjs";
+import { addCommands, createDataset, createDictionaries } from "../fixtures/dataset.mjs";
 
 const validator = createValidator();
 const errorsOf = (name, data) => validator.validate(name, data);
@@ -253,4 +254,51 @@ test("i18n keys follow the dotted naming rule", () => {
   const dict3 = createDictionaries().en;
   dict3.messages["dimension.the_nether"] = "";
   assert.equal(isValid("i18n", dict3), false);
+});
+
+test("commands file: fixture and committed file pass; worlds.commands is only true", async () => {
+  const ds = addCommands(createDataset());
+  assert.deepEqual(errorsOf("commands", ds.commands.player_club), []);
+  assert.deepEqual(errorsOf("worlds", ds.worlds), []);
+  const committed = JSON.parse(await readFile(new URL("../../site/data/commands/builder_world.json", import.meta.url), "utf8"));
+  assert.deepEqual(errorsOf("commands", committed), []);
+  for (const flag of [false, "true", 1, null]) {
+    assert.equal(isValid("worlds", withWorld((w) => { w.commands = flag; })), false, String(flag));
+  }
+});
+
+test("commands file rejects missing, extra and malformed fields", () => {
+  const check = (mutate) => {
+    const file = addCommands(createDataset()).commands.player_club;
+    mutate(file, file.commands[2]);
+    return isValid("commands", file);
+  };
+  assert.equal(check(() => {}), true);
+  assert.equal(check((_, c) => { delete c.count; }), false, "count is required");
+  assert.equal(check((_, c) => { c.command = "/give @p shield"; }), false, "extra key command");
+  assert.equal(check((_, c) => { c.custom_name = "x"; }), false, "extra key custom_name");
+  assert.equal(check((_, c) => { c.id = "Shield"; }), false, "upper-case id");
+  for (const item of ["minecraft:bow", "Bow", "bow ", "b o w", "b"]) {
+    assert.equal(check((_, c) => { c.item = item; }), false, item);
+  }
+  for (const ench of ["{}", "unbreaking:3", "{unbreaking:3 }", "{unbreaking:03}", "{unbreaking:0}", '{"unbreaking":3}', "{unbreaking:3}],custom_name=x", "{unbreaking:1000}", `{${"a".repeat(64)}:1${",b:1".repeat(250)}}`]) {
+    assert.equal(check((_, c) => { c.enchantments = ench; }), false, ench.slice(0, 40));
+  }
+  for (const count of [0, 65, 1.5, "1"]) {
+    assert.equal(check((_, c) => { c.count = count; }), false, String(count));
+  }
+  assert.equal(check((_, c) => { c.count = 64; }), true, "count 64");
+  assert.equal(check((_, c) => { c.label.en = "Shi\u200Bld"; }), false, "control character in label");
+  assert.equal(check((_, c) => { c.label["zh-TW"] = "x".repeat(31); }), false, "label over 30");
+  assert.equal(check((_, c) => { c.variant = { en: "Only English" }; }), false, "variant needs both languages");
+  assert.equal(check((file) => { file.commands = []; }), false, "empty commands");
+});
+
+test("commands schema patterns equal the regular expressions of site/js/lib/commands.js", async () => {
+  const schema = JSON.parse(await readFile(new URL("../../schemas/v1/commands.schema.json", import.meta.url), "utf8"));
+  const { properties } = schema.properties.commands.items;
+  assert.equal(properties.item.pattern, ITEM_RE.source);
+  assert.equal(properties.enchantments.pattern, ENCHANTMENTS_RE.source);
+  assert.equal(properties.enchantments.maxLength, MAX_ENCHANTMENTS_LENGTH);
+  assert.equal(properties.count.maximum, MAX_COUNT);
 });

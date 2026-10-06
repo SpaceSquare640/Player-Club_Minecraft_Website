@@ -130,6 +130,7 @@ export function createDataset() {
         },
       ],
     },
+    commands: {},
     i18n: null,
   };
 }
@@ -181,5 +182,41 @@ export function addSecondWorld(dataset, points = []) {
     dimensions: ["overworld", "the_nether"],
   });
   dataset.points.survival_two = { schemaVersion: 1, worldId: "survival_two", points };
+  return dataset;
+}
+
+/** Two commands of one item (with variants) and one single command, in the commands file format. */
+export function createCommands() {
+  return [
+    {
+      id: "diamond_axe_fortune",
+      label: { en: "Diamond Axe", "zh-TW": "鑽石斧" },
+      variant: { en: "Fortune", "zh-TW": "時運" },
+      item: "diamond_axe",
+      enchantments: "{fortune:3,unbreaking:3,mending:1}",
+      count: 1,
+    },
+    {
+      id: "diamond_axe_silk_touch",
+      label: { en: "Diamond Axe", "zh-TW": "鑽石斧" },
+      variant: { en: "Silk Touch", "zh-TW": "精準採集" },
+      item: "diamond_axe",
+      enchantments: "{silk_touch:1,unbreaking:3,mending:1}",
+      count: 1,
+    },
+    {
+      id: "shield",
+      label: { en: "Shield", "zh-TW": "盾牌" },
+      item: "shield",
+      enchantments: "{unbreaking:3,mending:1,vanishing_curse:1}",
+      count: 1,
+    },
+  ];
+}
+
+/** Adds a commands file for a world and sets the world's commands flag. */
+export function addCommands(dataset, worldId = "player_club", commands = createCommands()) {
+  dataset.worlds.worlds.find((w) => w.id === worldId).commands = true;
+  dataset.commands[worldId] = { schemaVersion: 1, worldId, commands };
   return dataset;
 }

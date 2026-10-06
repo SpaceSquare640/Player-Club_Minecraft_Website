@@ -2,8 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isInt64String, runCrossRules } from "../../scripts/lib/cross-rules.mjs";
+import { listDataFiles, loadDataset } from "../../scripts/lib/load-data.mjs";
 import { validateDataset } from "../../scripts/validate.mjs";
-import { NOW, addSecondWorld, createDataset, createDictionaries } from "../fixtures/dataset.mjs";
+import { NOW, addCommands, addSecondWorld, createCommands, createDataset, createDictionaries } from "../fixtures/dataset.mjs";
+import { memoryReader } from "../fixtures/memory.mjs";
 
 const run = (ds, options = {}) => runCrossRules(ds, { now: NOW, ...options });
 const errors = (issues, code) => issues.filter((i) => i.level === "error" && (!code || i.code === code));
@@ -422,4 +424,99 @@ test("X23 every world includes the overworld", () => {
   point(ds).dimension = "the_nether";
   point(ds).tags = ["nether_fortress"];
   assert.equal(errors(run(ds), "X23").length, 1);
+});
+
+test("X25 commands: flag and file belong together; worldId equals the file name", () => {
+  assert.deepEqual(run(withDictionaries(addCommands(createDataset()))), []);
+
+  const noFile = addCommands(createDataset());
+  delete noFile.commands.player_club;
+  assert.deepEqual(errors(run(noFile), "X25").map((e) => [e.file, e.path, e.message]), [
+    ["site/data/commands/player_club.json", "", "World player_club has commands: true but no commands file"],
+  ]);
+
+  const noFlag = addCommands(createDataset());
+  delete noFlag.worlds.worlds[0].commands;
+  assert.deepEqual(errors(run(noFlag), "X25").map((e) => e.message), [
+    "World player_club has a commands file but no commands: true in worlds.json",
+  ]);
+
+  const orphan = createDataset();
+  orphan.commands.old_world = { schemaVersion: 1, worldId: "old_world", commands: createCommands() };
+  assert.deepEqual(errors(run(orphan), "X25").map((e) => [e.file, e.message]), [
+    ["site/data/commands/old_world.json", "Orphan commands file: world old_world does not exist"],
+  ]);
+
+  const mismatch = addCommands(createDataset());
+  mismatch.commands.player_club.worldId = "other";
+  assert.deepEqual(errors(run(mismatch), "X25").map((e) => [e.path, e.message]), [
+    ["/worldId", "worldId other does not match the file name player_club"],
+  ]);
+});
+
+test("X25 commands: unique ids and valid enchantment lists (levels 1..255, no custom_name)", () => {
+  const issuesOf = (mutate) => {
+    const ds = addCommands(createDataset());
+    mutate(ds.commands.player_club.commands);
+    return errors(run(ds), "X25").map((e) => [e.path, e.message]);
+  };
+  assert.deepEqual(issuesOf((c) => { c[2].id = "diamond_axe_fortune"; }), [["/commands/2/id", "Duplicate command id diamond_axe_fortune"]]);
+  assert.deepEqual(issuesOf((c) => { c[2].enchantments = "{unbreaking:3,mending:1,unbreaking:2}"; }), [
+    ["/commands/2/enchantments", "Duplicate enchantment unbreaking in shield"],
+  ]);
+  assert.deepEqual(issuesOf((c) => { c[2].enchantments = "{unbreaking:255}"; }), []);
+  assert.deepEqual(issuesOf((c) => { c[2].enchantments = "{unbreaking:256}"; }), [
+    ["/commands/2/enchantments", "Enchantment level 256 of unbreaking in shield is outside 1..255"],
+  ]);
+  assert.deepEqual(issuesOf((c) => { c[2].enchantments = "{custom_name:1}"; }), [
+    ["/commands/2/enchantments", "shield: enchantments must not contain custom_name; the site builds the name"],
+  ]);
+});
+
+test("X25 commands: one item is adjacent, with the same label and distinct variants", () => {
+  const issuesOf = (mutate) => {
+    const ds = addCommands(createDataset());
+    mutate(ds.commands.player_club.commands);
+    return errors(run(ds), "X25").map((e) => [e.path, e.message]);
+  };
+  assert.deepEqual(issuesOf((c) => { c.push(c.splice(1, 1)[0]); }), [["/commands/2", "Commands for item diamond_axe must be adjacent (diamond_axe_silk_touch)"]]);
+  assert.deepEqual(issuesOf((c) => { c[1].label = { en: "Diamond Axe", "zh-TW": "鑽石斧頭" }; }), [
+    ["/commands/1/label", "diamond_axe_silk_touch: label must match the first diamond_axe command"],
+  ]);
+  assert.deepEqual(issuesOf((c) => { delete c[0].variant; }), [
+    ["/commands/0", "diamond_axe_fortune: variant is required when diamond_axe has more than one command"],
+  ]);
+  assert.deepEqual(issuesOf((c) => { c[1].variant = { en: "Fortune", "zh-TW": "時運二" }; }), [["/commands/1/variant/en", "Duplicate variant Fortune for diamond_axe"]]);
+  assert.deepEqual(issuesOf((c) => { c[2].variant = { en: "Plain", "zh-TW": "普通" }; }), [], "a variant on a single command is allowed");
+});
+
+test("X16 covers command labels and variants; X01 covers commands files", () => {
+  const ds = addCommands(createDataset());
+  const [axe, , shield] = ds.commands.player_club.commands;
+  shield.label = { en: "Claude Sword", "zh-TW": "盾牌" };
+  axe.variant["zh-TW"] = "筆記";
+  assert.deepEqual(errors(run(ds), "X16").map((e) => [e.file, e.path]), [
+    ["site/data/commands/player_club.json", "/commands/0/variant/zh-TW"],
+    ["site/data/commands/player_club.json", "/commands/2/label/en"],
+  ]);
+
+  const version = addCommands(createDataset());
+  version.commands.player_club.schemaVersion = 2;
+  assert.deepEqual(errors(run(version), "X01").map((e) => e.file), ["site/data/commands/player_club.json"]);
+});
+
+test("commands files are loaded and listed after points; no commands directory means none", async () => {
+  const ds = addCommands(addSecondWorld(createDataset()));
+  assert.deepEqual(listDataFiles(ds).map((f) => f.path).slice(-3), [
+    "site/data/points/player_club.json",
+    "site/data/points/survival_two.json",
+    "site/data/commands/player_club.json",
+  ]);
+  assert.equal(listDataFiles(ds).at(-1).schema, "commands");
+
+  const loaded = await loadDataset(memoryReader(ds));
+  assert.deepEqual(loaded.issues, []);
+  assert.deepEqual(loaded.dataset.commands, ds.commands);
+  const none = await loadDataset(memoryReader(createDataset()));
+  assert.deepEqual(none.dataset.commands, {});
 });

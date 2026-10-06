@@ -18,6 +18,7 @@ export const SCHEMA_NAMES = [
   "tags",
   "vpn",
   "points",
+  "commands",
   "changelog-updates",
   "changelog-points",
   "i18n",

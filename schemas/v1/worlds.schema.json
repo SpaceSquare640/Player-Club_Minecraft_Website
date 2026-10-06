@@ -52,6 +52,11 @@
             "maxItems": 3,
             "uniqueItems": true,
             "items": { "$ref": "urn:player-club:v1:defs#/$defs/dimension" }
+          },
+          "commands": {
+            "description": "Optional. true when site/data/commands/<id>.json exists; the site then shows the Commands tab. Omit otherwise.",
+            "type": "boolean",
+            "const": true
           }
         }
       }

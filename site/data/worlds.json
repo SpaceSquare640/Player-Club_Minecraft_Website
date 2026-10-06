@@ -27,7 +27,8 @@
         "z": -4
       },
       "spawnRadius": 5,
-      "dimensions": ["overworld", "the_nether", "the_end"]
+      "dimensions": ["overworld", "the_nether", "the_end"],
+      "commands": true
     }
   ]
 }

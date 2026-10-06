@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:player-club:v1:commands",
+  "title": "commands/<worldId>.json",
+  "description": "Give commands of one world for the Commands tab. Array order is display order. The custom name and the target selector are built by site/js/lib/commands.js and never stored here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "worldId", "commands"],
+  "properties": {
+    "schemaVersion": { "$ref": "urn:player-club:v1:defs#/$defs/schemaVersion" },
+    "worldId": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "item", "enchantments", "count"],
+        "properties": {
+          "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
+          "label": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText30" },
+          "variant": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText30" },
+          "item": {
+            "description": "Minecraft item id without namespace, e.g. diamond_sword.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          },
+          "enchantments": {
+            "description": "SNBT map of the enchantments component, e.g. {unbreaking:3,mending:1}. Levels 1 to 255, unique ids and no custom_name are checked by cross validation (X25).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "pattern": "^\\{[a-z][a-z0-9_]{0,63}:[1-9][0-9]{0,2}(?:,[a-z][a-z0-9_]{0,63}:[1-9][0-9]{0,2})*\\}$"
+          },
+          "count": { "type": "integer", "minimum": 1, "maximum": 64 }
+        }
+      }
+    }
+  }
+}

@@ -86,3 +86,33 @@ test("VPN data never contains a password", async () => {
   assert.doesNotMatch(text, /pass|pwd|secret|token/i);
   assert.deepEqual(Object.keys(dataset.vpn.vpns[0]).sort(), ["contactUrl", "id", "networkName", "type", "worldIds"]);
 });
+
+const COMMAND_IDS = [
+  "diamond_sword", "bow", "crossbow", "trident_channeling", "trident_riptide",
+  "diamond_axe_fortune", "diamond_axe_silk_touch", "diamond_hoe_fortune", "diamond_hoe_silk_touch",
+  "diamond_pickaxe_fortune", "diamond_pickaxe_silk_touch", "diamond_shovel_fortune", "diamond_shovel_silk_touch",
+  "fishing_rod", "shears", "shield", "elytra", "diamond_helmet", "diamond_chestplate", "diamond_leggings",
+  "diamond_boots_depth_strider", "diamond_boots_frost_walker",
+];
+
+test("Builder World commands: only Builder World has the flag; 22 commands in 16 item groups", () => {
+  const byId = new Map(dataset.worlds.worlds.map((w) => [w.id, w]));
+  assert.equal(byId.get("builder_world").commands, true);
+  assert.ok(!Object.hasOwn(byId.get("player_club"), "commands"));
+  assert.deepEqual(Object.keys(dataset.commands), ["builder_world"]);
+
+  const { commands } = dataset.commands.builder_world;
+  assert.deepEqual(commands.map((c) => c.id), COMMAND_IDS);
+  assert.ok(commands.every((c) => c.count === 1));
+  // Adjacent commands of one item form a group.
+  const sizes = [];
+  commands.forEach((c, i) => {
+    if (i > 0 && commands[i - 1].item === c.item) sizes[sizes.length - 1] += 1;
+    else sizes.push(1);
+  });
+  assert.deepEqual(sizes, [1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2]);
+  const bow = commands.find((c) => c.id === "bow");
+  assert.equal(bow.enchantments, "{unbreaking:3,power:5,punch:2,flame:1,infinity:1,mending:1,vanishing_curse:1}");
+  const pick = commands.find((c) => c.id === "diamond_pickaxe_silk_touch");
+  assert.deepEqual([pick.label, pick.variant], [{ en: "Diamond Pickaxe", "zh-TW": "鑽石鎬" }, { en: "Silk Touch", "zh-TW": "精準採集" }]);
+});

@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "worldId": "builder_world",
+  "commands": [
+    {
+      "id": "diamond_sword",
+      "label": {
+        "en": "Diamond Sword",
+        "zh-TW": "鑽石劍"
+      },
+      "item": "diamond_sword",
+      "enchantments": "{sweeping_edge:3,sharpness:5,knockback:2,fire_aspect:2,looting:3,unbreaking:3,mending:1,smite:5,bane_of_arthropods:5,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "bow",
+      "label": {
+        "en": "Bow",
+        "zh-TW": "弓"
+      },
+      "item": "bow",
+      "enchantments": "{unbreaking:3,power:5,punch:2,flame:1,infinity:1,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "crossbow",
+      "label": {
+        "en": "Crossbow",
+        "zh-TW": "弩"
+      },
+      "item": "crossbow",
+      "enchantments": "{multishot:1,piercing:4,quick_charge:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "trident_channeling",
+      "label": {
+        "en": "Trident",
+        "zh-TW": "三叉戟"
+      },
+      "variant": {
+        "en": "Channeling",
+        "zh-TW": "引雷"
+      },
+      "item": "trident",
+      "enchantments": "{unbreaking:3,loyalty:3,impaling:5,channeling:1,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "trident_riptide",
+      "label": {
+        "en": "Trident",
+        "zh-TW": "三叉戟"
+      },
+      "variant": {
+        "en": "Riptide",
+        "zh-TW": "激流"
+      },
+      "item": "trident",
+      "enchantments": "{unbreaking:3,loyalty:3,impaling:5,riptide:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_axe_fortune",
+      "label": {
+        "en": "Diamond Axe",
+        "zh-TW": "鑽石斧"
+      },
+      "variant": {
+        "en": "Fortune",
+        "zh-TW": "時運"
+      },
+      "item": "diamond_axe",
+      "enchantments": "{sharpness:5,efficiency:5,unbreaking:3,fortune:3,mending:1,smite:5,bane_of_arthropods:5,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_axe_silk_touch",
+      "label": {
+        "en": "Diamond Axe",
+        "zh-TW": "鑽石斧"
+      },
+      "variant": {
+        "en": "Silk Touch",
+        "zh-TW": "精準採集"
+      },
+      "item": "diamond_axe",
+      "enchantments": "{sharpness:5,efficiency:5,unbreaking:3,silk_touch:1,mending:1,smite:5,bane_of_arthropods:5,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_hoe_fortune",
+      "label": {
+        "en": "Diamond Hoe",
+        "zh-TW": "鑽石鋤"
+      },
+      "variant": {
+        "en": "Fortune",
+        "zh-TW": "時運"
+      },
+      "item": "diamond_hoe",
+      "enchantments": "{efficiency:5,unbreaking:3,fortune:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_hoe_silk_touch",
+      "label": {
+        "en": "Diamond Hoe",
+        "zh-TW": "鑽石鋤"
+      },
+      "variant": {
+        "en": "Silk Touch",
+        "zh-TW": "精準採集"
+      },
+      "item": "diamond_hoe",
+      "enchantments": "{efficiency:5,unbreaking:3,silk_touch:1,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_pickaxe_fortune",
+      "label": {
+        "en": "Diamond Pickaxe",
+        "zh-TW": "鑽石鎬"
+      },
+      "variant": {
+        "en": "Fortune",
+        "zh-TW": "時運"
+      },
+      "item": "diamond_pickaxe",
+      "enchantments": "{efficiency:5,unbreaking:3,fortune:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_pickaxe_silk_touch",
+      "label": {
+        "en": "Diamond Pickaxe",
+        "zh-TW": "鑽石鎬"
+      },
+      "variant": {
+        "en": "Silk Touch",
+        "zh-TW": "精準採集"
+      },
+      "item": "diamond_pickaxe",
+      "enchantments": "{efficiency:5,unbreaking:3,silk_touch:1,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_shovel_fortune",
+      "label": {
+        "en": "Diamond Shovel",
+        "zh-TW": "鑽石鏟"
+      },
+      "variant": {
+        "en": "Fortune",
+        "zh-TW": "時運"
+      },
+      "item": "diamond_shovel",
+      "enchantments": "{efficiency:5,unbreaking:3,fortune:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_shovel_silk_touch",
+      "label": {
+        "en": "Diamond Shovel",
+        "zh-TW": "鑽石鏟"
+      },
+      "variant": {
+        "en": "Silk Touch",
+        "zh-TW": "精準採集"
+      },
+      "item": "diamond_shovel",
+      "enchantments": "{efficiency:5,unbreaking:3,silk_touch:1,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "fishing_rod",
+      "label": {
+        "en": "Fishing Rod",
+        "zh-TW": "釣魚竿"
+      },
+      "item": "fishing_rod",
+      "enchantments": "{unbreaking:3,luck_of_the_sea:3,lure:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "shears",
+      "label": {
+        "en": "Shears",
+        "zh-TW": "剪刀"
+      },
+      "item": "shears",
+      "enchantments": "{efficiency:5,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "shield",
+      "label": {
+        "en": "Shield",
+        "zh-TW": "盾牌"
+      },
+      "item": "shield",
+      "enchantments": "{unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "elytra",
+      "label": {
+        "en": "Elytra",
+        "zh-TW": "鞘翅"
+      },
+      "item": "elytra",
+      "enchantments": "{blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_helmet",
+      "label": {
+        "en": "Diamond Helmet",
+        "zh-TW": "鑽石頭盔"
+      },
+      "item": "diamond_helmet",
+      "enchantments": "{respiration:3,aqua_affinity:1,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_chestplate",
+      "label": {
+        "en": "Diamond Chestplate",
+        "zh-TW": "鑽石胸甲"
+      },
+      "item": "diamond_chestplate",
+      "enchantments": "{blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_leggings",
+      "label": {
+        "en": "Diamond Leggings",
+        "zh-TW": "鑽石護腿"
+      },
+      "item": "diamond_leggings",
+      "enchantments": "{swift_sneak:3,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_boots_depth_strider",
+      "label": {
+        "en": "Diamond Boots",
+        "zh-TW": "鑽石靴子"
+      },
+      "variant": {
+        "en": "Depth Strider",
+        "zh-TW": "深海步行"
+      },
+      "item": "diamond_boots",
+      "enchantments": "{soul_speed:3,feather_falling:4,depth_strider:3,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    },
+    {
+      "id": "diamond_boots_frost_walker",
+      "label": {
+        "en": "Diamond Boots",
+        "zh-TW": "鑽石靴子"
+      },
+      "variant": {
+        "en": "Frost Walker",
+        "zh-TW": "冰霜行者"
+      },
+      "item": "diamond_boots",
+      "enchantments": "{soul_speed:3,feather_falling:4,frost_walker:2,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}",
+      "count": 1
+    }
+  ]
+}

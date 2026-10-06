@@ -1,6 +1,7 @@
 // Canonical JSON output (scripts/lib/json-io.mjs).
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { parseJsonText, stringifyJson } from "../../scripts/lib/json-io.mjs";
 import { createDictionaries } from "../fixtures/dataset.mjs";
 
@@ -104,4 +105,22 @@ test("optional world fields: world type follows gameVersion, respawn radius foll
   const world = { dimensions: ["overworld"], spawnRadius: 5, spawn: { z: 0, y: 64, x: 0 }, seed: "1", worldType: "superflat", gameVersion: "latest", edition: "java", name: "W", id: "w1" };
   const back = parseJsonText(stringifyJson({ schemaVersion: 1, worlds: [world] }, "worlds")).data;
   assert.deepEqual(Object.keys(back.worlds[0]), ["id", "name", "edition", "gameVersion", "worldType", "seed", "spawn", "spawnRadius", "dimensions"]);
+});
+
+test("commands files: schema key order, English first; the flag follows dimensions; committed file is canonical", async () => {
+  const scrambled = {
+    commands: [{ count: 1, enchantments: "{unbreaking:3}", item: "trident", variant: { "zh-TW": "引雷", en: "Channeling" }, label: { "zh-TW": "三叉戟", en: "Trident" }, id: "trident_channeling" }],
+    worldId: "builder_world",
+    schemaVersion: 1,
+  };
+  const text = stringifyJson(scrambled, "commands");
+  const keys = [...text.matchAll(/"([A-Za-z-]+)":/g)].map((m) => m[1]);
+  assert.deepEqual(keys, ["schemaVersion", "worldId", "commands", "id", "label", "en", "zh-TW", "variant", "en", "zh-TW", "item", "enchantments", "count"]);
+
+  const world = { commands: true, dimensions: ["overworld"], spawn: { x: 0, y: 64, z: 0 }, seed: "1", gameVersion: "latest", edition: "java", name: "W", id: "w1" };
+  const back = parseJsonText(stringifyJson({ schemaVersion: 1, worlds: [world] }, "worlds")).data;
+  assert.deepEqual(Object.keys(back.worlds[0]).slice(-2), ["dimensions", "commands"]);
+
+  const original = await readFile(new URL("../../site/data/commands/builder_world.json", import.meta.url), "utf8");
+  assert.equal(stringifyJson(parseJsonText(original).data, "commands"), original);
 });

@@ -23,13 +23,13 @@ import {
 import { BOT_IDENTITY, parseRequestLog, requestIssueNumbers, requestLogFormat } from "../../scripts/lib/git.mjs";
 import { evaluateRequest } from "../../scripts/lib/issue-parse.mjs";
 import { stringifyJson } from "../../scripts/lib/json-io.mjs";
-import { I18N_DIR, POINTS_DIR, listDataFiles, loadDataset } from "../../scripts/lib/load-data.mjs";
+import { COMMANDS_DIR, I18N_DIR, POINTS_DIR, listDataFiles, loadDataset } from "../../scripts/lib/load-data.mjs";
 import { DEPLOY_STATUS_MARKER, RESULT_MARKER, isDeployStatusBody } from "../../scripts/lib/messages.mjs";
 import { findInternalText } from "../../scripts/lib/public-text-guard.mjs";
 import { REPORT_MARKER, formatSnapshotMarker, parseSnapshotMarker, snapshotHash } from "../../scripts/lib/snapshot.mjs";
 import { validateDataset } from "../../scripts/validate.mjs";
 import { LABELS, TYPE_LABELS } from "../../site/js/lib/forms-meta.js";
-import { NOW, createDataset } from "../fixtures/dataset.mjs";
+import { NOW, addCommands, createDataset } from "../fixtures/dataset.mjs";
 import { ADD_VALUES, createIssue } from "../fixtures/issues.mjs";
 import { memoryReader } from "../fixtures/memory.mjs";
 
@@ -60,7 +60,7 @@ function createRepo(dataset, { rejectPushes = 0, onReject = null, trailers = [] 
     async list(dir) {
       const names = [...state.local.keys()].filter((k) => k.startsWith(`${dir}/`)).map((k) => k.slice(dir.length + 1));
       if (dir === POINTS_DIR) return names;
-      if (dir === I18N_DIR) return names.length > 0 ? names : null;
+      if (dir === I18N_DIR || dir === COMMANDS_DIR) return names.length > 0 ? names : null;
       return null;
     },
   };
@@ -331,6 +331,16 @@ test("applyRequest spawn: only world.spawn changes; one spawn entry; point ids u
   assert.deepEqual(applied.dataset.manifest, { schemaVersion: 1, pointSeq: 2, changeSeq: 3, updateSeq: 1 });
   assert.deepEqual(applied.files.map((f) => f.path), ["site/data/worlds.json", "site/data/changelog/points.json", "site/data/manifest.json"]);
   assert.equal(applied.subject, "chore(data): update world spawn of player_club");
+  assert.deepEqual(validateDataset(applied.dataset, { now: NOW }).errors, []);
+});
+
+test("applyRequest spawn keeps the commands flag and its position in worlds.json", () => {
+  const { applied } = applyValid("spawn", { target_id: "spawn:player_club", x: "8", y: "100", z: "5" }, { dataset: addCommands(createDataset()) });
+  const world = applied.dataset.worlds.worlds[0];
+  assert.equal(world.commands, true);
+  const text = stringifyJson(applied.files[0].select(applied.dataset), applied.files[0].schema);
+  assert.ok(text.includes('"dimensions": ["overworld", "the_nether", "the_end"],\n      "commands": true\n    }'), text);
+  assert.deepEqual(applied.dataset.commands, addCommands(createDataset()).commands, "commands file untouched");
   assert.deepEqual(validateDataset(applied.dataset, { now: NOW }).errors, []);
 });
 
