@@ -3,13 +3,17 @@
 // data, hash, points of the current world, render; the change log loads on demand.
 // Render pipelines are separate: the world info panel depends on world + language only, the pinned
 // spawn card on world + dimension + language, and only the list follows search and tags.
+// Worlds with commands: true get a Commands tab after the dimension tabs (view=commands); its data
+// loads on first use and its five settings live only in app memory (never in the hash or storage).
 
 import { createRepository } from "./data/repository.js";
 import { getLang, initI18n, setLang, t, textLang } from "./i18n.js";
+import { DEFAULT_SETTINGS } from "./lib/commands.js";
 import { indexTags, matchPoint, sortPoints } from "./lib/filter.js";
 import { defaultState, toHref } from "./lib/hash.js";
 import { getState, setContext, setState, subscribe, syncFromHash } from "./state.js";
 import { createChangelogView } from "./ui/changelog.js";
+import { COMMANDS_HEADING_ID, createCommandsPanel } from "./ui/commands-panel.js";
 import { closeDialog, initDialog, openSubmitDialog } from "./ui/dialog.js";
 import { createTabs } from "./ui/dimension-tabs.js";
 import { createScope, h, prefersReducedMotion, replaceChildren } from "./ui/dom.js";
@@ -19,7 +23,7 @@ import { announceFilterResult, initLive, resetFilterAnnouncement } from "./ui/li
 import { closeOpenMenu } from "./ui/menu.js";
 import { buildTagFilters, countByDimension, hasConditions, orderedDimensions, resultSummary } from "./ui/model.js";
 import { renderPointList } from "./ui/point-list.js";
-import { pointsSkeleton } from "./ui/skeleton.js";
+import { commandsSkeleton, pointsSkeleton } from "./ui/skeleton.js";
 import { renderSpawnCard, SPAWN_TITLE_ID } from "./ui/spawn-card.js";
 import { initToast, showToast } from "./ui/toast.js";
 import { renderVpn, vpnsForWorld } from "./ui/vpn.js";
@@ -44,6 +48,8 @@ const dom = {
   aside: $("pc-aside"),
   tabsBar: $("pc-tabs-bar"),
   tabpanel: $("pc-tabpanel"),
+  pointsView: $("pc-points-view"),
+  commandsHost: $("pc-commands-host"),
   toolbarHost: $("pc-toolbar-host"),
   pointsHeading: $("pc-points-heading"),
   pinnedHost: $("pc-pinned-host"),
@@ -58,6 +64,12 @@ const repo = createRepository();
 const app = {
   core: null,
   points: {},
+  commands: {},
+  // Commands tab: raw values of the five settings and the panel's own display state, kept for this visit only.
+  commandSettings: { ...DEFAULT_SETTINGS },
+  commandsUi: { blockOpen: true, notice: false },
+  commandsPanel: null,
+  commandsRequest: 0,
   ctx: null,
   ready: false,
   lastPointsState: null,
@@ -65,8 +77,8 @@ const app = {
   pendingQuery: null,
   pendingTarget: null,
   vpnExpanded: null,
-  keys: { world: "", pinned: "", list: "" },
-  scopes: { world: createScope(), pinned: createScope(), list: createScope() },
+  keys: { world: "", pinned: "", list: "", commands: "" },
+  scopes: { world: createScope(), pinned: createScope(), list: createScope(), commands: createScope() },
   timers: { filter: null, hash: null, highlight: null },
   highlighted: null,
   userFilterChange: false,
@@ -81,6 +93,9 @@ initDialog(dom.app);
 const currentWorld = () => app.core?.worlds.find((world) => world.id === getState().worldId) ?? null;
 const discordUrl = () => app.core?.config.discordInviteUrl ?? null;
 const loadingLabel = () => (textLang("app.loading") ? t("app.loading") : "Loading…");
+const COMMANDS_TAB = "commands";
+/** True when the Commands tab is shown (hash validation already requires a world with commands: true). */
+const isCommandsView = (state) => state.tab === "points" && state.view === COMMANDS_TAB;
 
 /** Text content and attributes of static elements (data-i18n, data-i18n-attr, data-i18n-en). */
 function applyStaticText() {
@@ -135,7 +150,7 @@ function updateHeader(state) {
       else link.removeAttribute("aria-current");
     }
   }
-  dom.skip.textContent = state.tab === "changelog" ? t("skip.changelog") : t("skip.points");
+  dom.skip.textContent = state.tab === "changelog" ? t("skip.changelog") : isCommandsView(state) ? t("skip.commands") : t("skip.points");
 }
 
 function updateTitle(state) {
@@ -145,6 +160,10 @@ function updateTitle(state) {
     return;
   }
   const world = currentWorld();
+  if (world && isCommandsView(state)) {
+    document.title = t("title.commands", { world: world.name, site });
+    return;
+  }
   document.title = world ? t("title.points", { world: world.name, dimension: t(`dimension.${state.dimension}`), site }) : site;
 }
 
@@ -167,9 +186,10 @@ function setBusy(busy) {
 const dimensionTabs = createTabs({
   idPrefix: "pc-dim-tab",
   panelId: "pc-tabpanel",
-  onSelect: (dimension) => {
+  onSelect: (id) => {
     flushQuery();
-    setState({ dimension }, { history: "push" });
+    if (id === COMMANDS_TAB) setState({ view: COMMANDS_TAB }, { history: "push" });
+    else setState({ dimension: id, view: null }, { history: "push" });
   },
 });
 dom.tabsBar.append(dimensionTabs.el);
@@ -289,15 +309,25 @@ function renderPoints(state) {
   const dimensions = orderedDimensions(world);
 
   renderWorldSection(world, state);
-  renderPinned(world, state);
 
+  // Dimension badges keep counting with the kept search and tags, also while the Commands tab is shown.
   const counts = countByDimension(allPoints, dimensions, query, tagsById);
-  dimensionTabs.update(
-    dimensions.map((dim) => ({ id: dim, label: t(`dimension.${dim}`), shortLabel: t(`dimension.${dim}.short`), count: counts[dim] })),
-    state.dimension,
-    t("dimension.label"),
-  );
-  dom.tabpanel.setAttribute("aria-labelledby", dimensionTabs.idOf(state.dimension));
+  const tabs = dimensions.map((dim) => ({ id: dim, label: t(`dimension.${dim}`), shortLabel: t(`dimension.${dim}.short`), count: counts[dim] }));
+  if (world.commands === true) tabs.push({ id: COMMANDS_TAB, label: t("commands.tab"), shortLabel: t("commands.tab.short"), count: null });
+  const commandsView = isCommandsView(state) && world.commands === true;
+  const selectedTab = commandsView ? COMMANDS_TAB : state.dimension;
+  dimensionTabs.update(tabs, selectedTab, world.commands === true ? t("commands.tablist") : t("dimension.label"));
+  dom.tabpanel.setAttribute("aria-labelledby", dimensionTabs.idOf(selectedTab));
+
+  // The two views switch as whole containers; the list keeps its own render cache meanwhile.
+  dom.pointsView.hidden = commandsView;
+  dom.commandsHost.hidden = !commandsView;
+  if (commandsView) {
+    app.userFilterChange = false;
+    renderCommands(world, state);
+    return;
+  }
+  renderPinned(world, state);
 
   const inDimension = allPoints.filter((point) => point.dimension === state.dimension);
   const shown = sortPoints(inDimension.filter((point) => matchPoint(point, { query, tagIds: state.tagIds }, tagsById)));
@@ -340,6 +370,76 @@ function renderPoints(state) {
     app.userFilterChange = false;
     announceFilterResult(summaryText);
   }
+}
+
+// ------------------------------------------------------------------ Commands tab
+
+/** Builds the panel once per world and language; settings changes update it in place. */
+function renderCommands(world, state) {
+  const commands = app.commands[world.id];
+  if (!commands) return; // the loading skeleton or the error panel stays in the host
+  const key = `${world.id}|${state.lang}`;
+  if (key === app.keys.commands) return;
+  app.keys.commands = key;
+  // A rebuild (language change) keeps focus on the same control when it has an id.
+  const focusedId = dom.commandsHost.contains(document.activeElement) ? document.activeElement.id : "";
+  app.scopes.commands.dispose();
+  app.commandsPanel = createCommandsPanel({
+    commands,
+    settings: app.commandSettings,
+    ui: app.commandsUi,
+    scope: app.scopes.commands,
+    onSettingsChange: (raw) => {
+      app.commandSettings = raw;
+    },
+  });
+  replaceChildren(dom.commandsHost, app.commandsPanel.el);
+  if (focusedId) document.getElementById(focusedId)?.focus({ preventScroll: true });
+}
+
+/** Loads a world's commands (cached by the repository); the skeleton appears after 150 ms. */
+async function loadWorldCommands(worldId) {
+  if (app.commands[worldId]) return true;
+  const request = (app.commandsRequest += 1);
+  app.keys.commands = "";
+  const timer = setTimeout(() => {
+    if (request !== app.commandsRequest) return;
+    replaceChildren(dom.commandsHost, commandsSkeleton(loadingLabel()));
+    dom.tabpanel.setAttribute("aria-busy", "true");
+  }, SKELETON_DELAY_MS);
+  try {
+    app.commands[worldId] = await repo.loadCommands(worldId);
+    return true;
+  } catch (error) {
+    // An older request that failed must not replace the view of a newer one.
+    if (request === app.commandsRequest) {
+      app.keys.commands = "";
+      renderError(dom.commandsHost, {
+        error,
+        discordUrl: discordUrl(),
+        titleKey: "commands.error",
+        onRetry: async () => {
+          if (!(await loadWorldCommands(worldId))) return;
+          render(getState());
+          app.commandsPanel?.focusTitle();
+        },
+      });
+    }
+    return false;
+  } finally {
+    clearTimeout(timer);
+    if (request === app.commandsRequest) dom.tabpanel.removeAttribute("aria-busy");
+  }
+}
+
+/** After a render: loads the current world's commands when the Commands tab needs them, then renders again. */
+async function ensureCommandsView() {
+  const state = getState();
+  if (!isCommandsView(state) || app.commands[state.worldId]) return;
+  const worldId = state.worldId;
+  await loadWorldCommands(worldId);
+  const now = getState();
+  if (isCommandsView(now) && now.worldId === worldId) render(now);
 }
 
 // ------------------------------------------------------------------ Change log page
@@ -395,6 +495,7 @@ function toastNotFound(dropped) {
 
 function render(state, changed = null) {
   const tabChanged = changed?.includes("tab");
+  const viewChanged = !tabChanged && state.tab === "points" && changed?.includes("view");
   updateHeader(state);
   showPage(state.tab);
   if (state.tab === "points") {
@@ -410,6 +511,10 @@ function render(state, changed = null) {
     globalThis.scrollTo({ top: 0, behavior: "auto" });
     if (state.tab === "points") dom.worldTitle.focus({ preventScroll: true });
     else changelog.focusTitle();
+  }
+  // Switching to or from the Commands tab far down a long list: show the top of the panel.
+  if (viewChanged && dom.tabpanel.getBoundingClientRect().top < dom.tabsBar.getBoundingClientRect().bottom) {
+    dom.tabpanel.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
   }
 }
 
@@ -432,6 +537,7 @@ async function onStateChange(state, _prev, meta) {
   }
   render(getState(), meta.changed);
   handleDeepLink();
+  await ensureCommandsView();
 }
 
 // ------------------------------------------------------------------ Loading and errors
@@ -510,6 +616,7 @@ async function boot({ retry = false } = {}) {
   toastNotFound(dropped);
   render(state);
   handleDeepLink();
+  await ensureCommandsView();
   if (retry) (state.tab === "points" ? dom.worldTitle : dom.changelogPage.querySelector("h1"))?.focus();
 }
 
@@ -532,7 +639,9 @@ for (const button of dom.app.querySelectorAll(".pc-lang__btn")) {
 }
 
 dom.skip.addEventListener("click", () => {
-  if (getState().tab === "changelog") changelog.focusList();
+  const state = getState();
+  if (state.tab === "changelog") changelog.focusList();
+  else if (isCommandsView(state)) (document.getElementById(COMMANDS_HEADING_ID) ?? dom.commandsHost.querySelector("button"))?.focus();
   else dom.pointsHeading.focus();
 });
 

@@ -16,6 +16,7 @@ import {
   writeStoredLang,
 } from "../../site/js/i18n.js";
 import { DataError } from "../../site/js/data/repository.js";
+import { COLORS, MODES } from "../../site/js/lib/commands.js";
 import { REPO_ROOT, createFsReader, loadDataset } from "../../scripts/lib/load-data.mjs";
 import { validateDataset } from "../../scripts/validate.mjs";
 import { createFakeFetch, createFakeStorage } from "../fixtures/front.mjs";
@@ -233,4 +234,35 @@ test("X19 is active on the committed data: dictionaries present, no errors or wa
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.warnings, []);
   assert.equal(result.crossSkipped, false);
+});
+
+test("committed dictionaries: Commands tab keys in both languages, one per colour and mode, no dashes", async () => {
+  const en = (await readDict("en")).messages;
+  const zh = (await readDict("zh-TW")).messages;
+  const keys = [
+    "commands.tab", "commands.tab.short", "commands.tablist", "commands.heading", "commands.settings.title", "commands.version",
+    "commands.mode.label", "commands.mode.chat.note", "commands.block.title", "commands.block.step1", "commands.block.step2",
+    "commands.block.step3", "commands.block.step4", "commands.block.requires", "commands.block.nearest", "commands.block.copy",
+    "commands.name.label", "commands.name.hint", "commands.name.removed", "commands.name.count", "commands.name.clear",
+    "commands.symbols.label", "commands.symbolColor.label", "commands.nameColor.label", "commands.preview.label",
+    "commands.preview.note", "commands.preview.darkNote", "commands.reset", "commands.reset.live", "commands.copy",
+    "commands.copy.live", "commands.item.variant", "commands.length", "commands.length.over", "commands.error",
+    "commands.empty", "skip.commands", "title.commands",
+    ...COLORS.map((id) => `commands.colors.${id}`),
+    ...MODES.map((mode) => `commands.mode.${mode.id}`),
+  ];
+  for (const key of keys) {
+    for (const [lang, dict] of [["en", en], ["zh-TW", zh]]) assert.equal(typeof dict[key], "string", `${lang} ${key}`);
+  }
+  for (const key of Object.keys(en).filter((k) => k.startsWith("commands."))) {
+    assert.ok(keys.includes(key), `unexpected key ${key}`);
+    for (const text of [en[key], zh[key]]) assert.doesNotMatch(text, /[—–]/, key);
+  }
+  assert.deepEqual(MODES.map((m) => m.id), ["block", "chat"]);
+  assert.equal(en["commands.tab"], "Commands");
+  assert.equal(zh["commands.tab"], "指令");
+  assert.equal(en["commands.name.removed"], "Unsupported characters were removed");
+  assert.equal(zh["commands.name.removed"], "已移除不支援的字元");
+  assert.equal(en["commands.colors.light_purple"], "Light Purple");
+  assert.equal(zh["commands.colors.gold"], "金色");
 });

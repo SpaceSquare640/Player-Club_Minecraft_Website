@@ -57,6 +57,26 @@ test("index.html: landmarks, live region, lang and the permanent English Minecra
   assert.doesNotMatch(html, /href="#pc-/, "no #id anchors (the hash holds the state)");
 });
 
+test("index.html: the tab panel holds the points view and the hidden Commands host, switched as whole containers", () => {
+  const start = html.indexOf('<div class="pc-tabpanel" id="pc-tabpanel" role="tabpanel">');
+  const view = html.indexOf('<div id="pc-points-view">', start);
+  const host = html.indexOf('<div class="pc-cmd" id="pc-commands-host" hidden></div>', view);
+  assert.ok(start >= 0 && view > start && host > view, "tab panel > points view, then the hidden commands host");
+  const points = html.slice(view, host);
+  for (const id of ["pc-toolbar-host", "pc-points-heading", "pc-pinned-host", "pc-cards", "pc-empty"]) assert.ok(points.includes(`id="${id}"`), id);
+  assert.equal(points.trimEnd().endsWith("</div>\n                </div>".trimEnd()), true, "the points view closes before the commands host");
+});
+
+test("CSS: the 16 Minecraft colours have a token and a class; swatches and preview use no style attributes", () => {
+  const colors = ["black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white"];
+  for (const id of colors) {
+    const token = `--pc-mc-${id.replaceAll("_", "-")}`;
+    assert.match(css["css/tokens.css"], new RegExp(`${token}: #[0-9a-f]{6};`), token);
+    assert.ok(css["css/components.css"].includes(`.pc-mc--${id} { --pc-mc: var(${token}); }`), id);
+  }
+  for (const { file, source } of jsSources) assert.doesNotMatch(source, /\.style\b|setAttribute\(\s*"style"/, file);
+});
+
 test("every local asset referenced by HTML, CSS and JS exists", () => {
   const refs = new Set();
   for (const m of html.matchAll(/(?:src|href|srcset)="([^"]+)"/g)) {

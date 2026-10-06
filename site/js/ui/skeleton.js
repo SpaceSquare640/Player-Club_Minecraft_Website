@@ -40,3 +40,14 @@ export function pointsSkeleton(label) {
 export function changelogSkeleton(label) {
   return h("div", { className: "pc-skeleton-rows", attrs: { role: "status", "aria-label": label } }, ...[1, 2, 3, 4, 5].map(() => bar("row")));
 }
+
+/** Commands tab: settings outline (title, mode, two fields) and 3 command cards. */
+export function commandsSkeleton(label) {
+  const card = () => h("li", { className: "pc-skeleton-card pc-skeleton-card--cmd" }, bar("line"), bar("code"), bar("button"));
+  return h(
+    "div",
+    { className: "pc-cmd__inner", attrs: { role: "status", "aria-label": label } },
+    h("div", { className: "pc-skeleton-settings" }, bar("line"), bar("tab"), bar("tab"), bar("tab")),
+    h("ul", { className: "pc-cmd-list", attrs: { role: "list" } }, card(), card(), card()),
+  );
+}
