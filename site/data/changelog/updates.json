@@ -36,6 +36,18 @@
         "en": "Coordinate requests",
         "zh-TW": "座標請求"
       }
+    },
+    {
+      "id": "u0004",
+      "date": "2026-10-07",
+      "summary": {
+        "en": "Builder World: new Commands tab with give commands for enchanted tools, weapons and armor that you can name, style and copy",
+        "zh-TW": "Builder World 新增「指令」分頁：附魔工具、武器與裝備的 give 指令，可自訂名稱與樣式後複製"
+      },
+      "scope": {
+        "en": "Builder World, Commands tab",
+        "zh-TW": "Builder World、指令分頁"
+      }
     }
   ]
 }

@@ -16,6 +16,7 @@ Website: https://spacesquare640.github.io/Player-Club_Minecraft_Website/
 | --- | --- |
 | World info | World name, game version, seed and world spawn pinned at the top, each with one-click copy; world type and respawn radius when set |
 | Dimension tabs | Overworld, The Nether, The End |
+| Commands tab | Builder World: `/give` commands for enchanted tools, weapons and armor. Pick command block or chat, item name, symbols and colours, then copy; the settings are kept only while the page is open |
 | Point cards | Name, tags, X Y Z, note, submitter and last update; one-click copy of "X Y Z" |
 | Search and filter | Keyword search and tag filters; view state is stored in the URL for sharing |
 | Worlds and editions | Multiple worlds, Java Edition and Bedrock Edition, configured by data |
@@ -59,10 +60,12 @@ This repository does not keep a separate change log file. Site updates and coord
 
 A static website (HTML, CSS, JavaScript) with no framework. Coordinates and other data are stored as JSON, separated from the UI, and every data file carries a `schemaVersion`. GitHub Actions validates issue requests, writes data and deploys to GitHub Pages.
 
+The Commands tab appears for worlds marked `"commands": true` in `site/data/worlds.json`. Its data, `site/data/commands/<worldId>.json` (schema `schemas/v1/commands.schema.json`), stores only the item, enchantments, count and bilingual names; the page loads it when the tab is opened and builds each full command from the current settings. Commands are edited by the owner only, not through Issue forms.
+
 ```text
 .github/        Issue forms and GitHub Actions workflows
 site/           Website (GitHub Pages root)
-  data/         JSON data: worlds, points, tags, change log
+  data/         JSON data: worlds, points, commands, tags, change log
   i18n/         Traditional Chinese and English UI dictionaries
 schemas/v1/     JSON Schema
 scripts/        Validation, issue processing and deployment scripts (Node.js)
@@ -124,9 +127,10 @@ The owner edits the JSON data directly and pushes to `Source_Code` without a pul
 1. Run `git pull` so the id sequences are up to date, including requests already written by the bot.
 2. For a new point, run `npm run new-id -- point` to allocate its id.
 3. Edit the files under `site/data/`. Points are stored per world in `site/data/points/<worldId>.json`. Timestamps of a new point can be left as empty strings.
+   - Commands are stored per world in `site/data/commands/<worldId>.json`. After editing one, run `npm run format`, then `npm run check`.
 4. Record the change:
    - Point or world spawn changes: `npm run changelog:sync` adds the "Coordinate changes" entries and fills the timestamps.
-   - Site or feature changes, seed changes and new worlds: `npm run changelog:update`.
+   - Site or feature changes, seed changes, new worlds, and commands added or removed: `npm run changelog:update`. Typo fixes in commands need no entry.
    - Changes to worlds, tags or dictionaries: also run `npm run gen:forms`.
      - If the forms-check job of the publish workflow fails because the encoded forms patch is over the size limit (about 75 KB of changes), run `npm run gen:forms` locally and push the result.
 5. Run `npm run check` and make sure it passes.
@@ -175,6 +179,7 @@ Player Club 社群的 Minecraft 世界座標網站。集中存放各世界的村
 | --- | --- |
 | 世界資訊 | 世界名稱、遊戲版本、Seed 與世界出生座標置頂顯示，可一鍵複製；世界類型與重生半徑（有設定時） |
 | 維度分頁 | 主世界、地獄、終界 |
+| 指令分頁 | Builder World：附魔工具、武器與裝備的 `/give` 指令。可選擇指令方塊或聊天欄、物品名稱、符號與顏色後複製；設定只在頁面開啟期間保留 |
 | 座標卡片 | 名稱、標籤、X Y Z、說明、提交者、更新時間；一鍵複製「X Y Z」 |
 | 搜尋與篩選 | 關鍵字搜尋與標籤篩選；畫面狀態寫入網址，可直接分享連結 |
 | 多世界與多版本 | 支援多個世界及 Java 版、基岩版，由資料設定 |
@@ -218,10 +223,12 @@ Player Club 社群的 Minecraft 世界座標網站。集中存放各世界的村
 
 純靜態網站（HTML、CSS、JavaScript），不使用框架。座標等資料以 JSON 存放並與介面分離，每個資料檔皆帶 `schemaVersion`。GitHub Actions 負責驗證 Issue 請求、寫入資料與部署至 GitHub Pages。
 
+`site/data/worlds.json` 中標示 `"commands": true` 的世界會顯示指令分頁。資料檔 `site/data/commands/<worldId>.json`（schema 為 `schemas/v1/commands.schema.json`）只存物品、附魔、數量與雙語名稱；開啟分頁時才載入，並依目前設定組出完整指令。指令只由擁有者編輯，不開放 Issue 表單申請。
+
 ```text
 .github/        Issue 表單與 GitHub Actions workflows
 site/           網站（GitHub Pages 根目錄）
-  data/         世界、座標、標籤、變更紀錄等 JSON 資料
+  data/         世界、座標、指令、標籤、變更紀錄等 JSON 資料
   i18n/         繁中、英文介面字典
 schemas/v1/     JSON Schema
 scripts/        資料驗證、Issue 處理與部署腳本（Node.js）
@@ -283,9 +290,10 @@ npm run changelog:update -- --summary-en "..." --summary-zh "..." --scope-en "..
 1. 先 `git pull`，確保 id 序號為最新（含 bot 已寫入的請求）。
 2. 新增座標時，先執行 `npm run new-id -- point` 取得 id。
 3. 編輯 `site/data/` 下的檔案。座標依世界存放於 `site/data/points/<worldId>.json`；新座標的時間戳可留空字串。
+   - 指令依世界存放於 `site/data/commands/<worldId>.json`。編輯後執行 `npm run format`，再執行 `npm run check`。
 4. 補變更紀錄：
    - 座標或世界出生座標變更：`npm run changelog:sync` 會補「座標更動」條目與時間戳。
-   - 網站或功能變更、seed 變更、新增世界：`npm run changelog:update`。
+   - 網站或功能變更、seed 變更、新增世界、新增或移除指令：`npm run changelog:update`。只修正指令錯字可不補。
    - 世界、標籤或字典變更：另執行 `npm run gen:forms`。
      - 若 publish workflow 的 forms-check 因表單差異過大（編碼後超過上限，約 75 KB）而失敗：在本機執行 `npm run gen:forms` 後推送結果。
 5. 執行 `npm run check`，確認全數通過。
