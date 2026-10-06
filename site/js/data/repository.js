@@ -111,7 +111,7 @@ function cached(cache, key, load) {
  * @param {{ baseUrl?: URL | string, fetch?: typeof fetch }} [options]
  *   baseUrl defaults to new URL("./data/", document.baseURI); fetch defaults to the global fetch.
  * @returns {{ loadCore: () => Promise<object>, loadPoints: (worldId: string) => Promise<object[]>,
- *   loadChangelog: (kind: "updates" | "points") => Promise<object[]> }}
+ *   loadCommands: (worldId: string) => Promise<object[]>, loadChangelog: (kind: "updates" | "points") => Promise<object[]> }}
  *   Results are cached and deeply frozen.
  */
 export function createRepository({ baseUrl, fetch: fetchImpl } = {}) {
@@ -154,6 +154,20 @@ export function createRepository({ baseUrl, fetch: fetchImpl } = {}) {
     });
   }
 
+  /**
+   * Give commands of one world (Commands tab), loaded on demand for worlds with commands: true.
+   * Unknown fields are ignored; the panel skips entries that fail isCommandEntry (lib/commands.js).
+   */
+  function loadCommands(worldId) {
+    if (typeof worldId !== "string" || !WORLD_ID_RE.test(worldId)) throw new TypeError(`Invalid world id: ${worldId}`);
+    return cached(cache, `commands:${worldId}`, async () => {
+      const file = `commands/${worldId}.json`;
+      const data = await get(file);
+      if (data.worldId !== worldId) throw new DataError("PARSE", file);
+      return deepFreeze(requireArray(data, "commands", file));
+    });
+  }
+
   /** Change log entries: kind "updates" (Updates) or "points" (Coordinate changes), loaded on demand. */
   function loadChangelog(kind) {
     if (!CHANGELOG_KINDS.includes(kind)) throw new TypeError(`Invalid change log kind: ${kind}`);
@@ -163,5 +177,5 @@ export function createRepository({ baseUrl, fetch: fetchImpl } = {}) {
     });
   }
 
-  return { loadCore, loadPoints, loadChangelog };
+  return { loadCore, loadPoints, loadCommands, loadChangelog };
 }

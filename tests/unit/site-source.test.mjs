@@ -30,7 +30,7 @@ const sources = await Promise.all(files.map(async (file) => ({ file: path.relati
 
 test("site/js contains the M2 modules", () => {
   const names = sources.map((s) => s.file);
-  for (const expected of ["site/js/i18n.js", "site/js/state.js", "site/js/data/repository.js", "site/js/lib/hash.js", "site/js/lib/filter.js", "site/js/lib/text.js", "site/js/lib/coords.js"]) {
+  for (const expected of ["site/js/i18n.js", "site/js/state.js", "site/js/data/repository.js", "site/js/lib/hash.js", "site/js/lib/filter.js", "site/js/lib/text.js", "site/js/lib/coords.js", "site/js/lib/commands.js"]) {
     assert.ok(names.includes(expected), expected);
   }
 });

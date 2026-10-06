@@ -17,7 +17,7 @@ function setup(hash = "", options = {}) {
 test("initial state before data: defaults, and syncFromHash leaves the hash untouched", () => {
   const win = createFakeWindow("world=survival_two");
   const store = createStore({ win });
-  assert.deepEqual(store.getState(), { tab: "points", log: "updates", worldId: null, dimension: null, query: "", tagIds: [], pointId: null, lang: "en" });
+  assert.deepEqual(store.getState(), { tab: "points", log: "updates", worldId: null, view: null, dimension: null, query: "", tagIds: [], pointId: null, lang: "en" });
   store.syncFromHash();
   assert.equal(win.location.hash, "#world=survival_two");
   assert.deepEqual(win.calls, []);
@@ -156,4 +156,60 @@ test("state objects are frozen and unsubscribe works", () => {
   assert.equal(events.at(-1).state.tab, "changelog");
   assert.deepEqual(diffState({ tagIds: ["a"] }, { tagIds: ["a"] }), []);
   assert.deepEqual(diffState({ tagIds: ["a"] }, { tagIds: ["b"] }), ["tagIds"]);
+});
+
+// survival_two and a third world both have commands: true; player_club has none.
+function commandsSetup(hash = "world=survival_two&dim=the_nether&q=hub&tags=base") {
+  const ctx = createHashContext();
+  ctx.worlds = [
+    ...ctx.worlds.map((w) => (w.id === "survival_two" ? { ...w, commands: true } : w)),
+    { ...ctx.worlds[1], id: "creative_three", name: "Creative Three", commands: true },
+  ];
+  ctx.points.creative_three = [];
+  const result = setup(hash, { ctx });
+  result.store.syncFromHash();
+  result.win.calls.length = 0;
+  result.events.length = 0;
+  return result;
+}
+
+test("view=commands: entering keeps dim, q and tags; leaving through a dimension tab returns to the list", () => {
+  const { win, store } = commandsSetup();
+  assert.equal(store.setState({ view: "commands" }, { history: "push" }), true);
+  assert.deepEqual(win.calls, [{ mode: "push", url: "#world=survival_two&view=commands&dim=the_nether&q=hub&tags=base" }]);
+  const inside = store.getState();
+  assert.deepEqual([inside.view, inside.dimension, inside.query, [...inside.tagIds]], ["commands", "the_nether", "hub", ["base"]]);
+
+  store.setState({ dimension: "the_nether", view: null }, { history: "push" });
+  assert.equal(win.calls.at(-1).url, "#world=survival_two&dim=the_nether&q=hub&tags=base");
+  assert.deepEqual([store.getState().view, store.getState().query, [...store.getState().tagIds]], [null, "hub", ["base"]]);
+});
+
+test("view=commands is reset by a world change (even to a world with commands) and cleared by a point", () => {
+  const { store } = commandsSetup();
+  store.setState({ view: "commands" }, { history: "push" });
+  store.setState({ worldId: "creative_three" }, { history: "push" });
+  assert.deepEqual([store.getState().worldId, store.getState().view], ["creative_three", null]);
+
+  store.setState({ worldId: "survival_two", view: "commands" }, { history: "push" });
+  assert.equal(store.getState().view, "commands");
+  store.setState({ pointId: "p0003" }, { history: "push" });
+  assert.deepEqual([store.getState().pointId, store.getState().view], ["p0003", null]);
+
+  // A world without commands cannot hold the view.
+  store.setState({ worldId: "player_club", view: "commands" }, { history: "push" });
+  assert.equal(store.getState().view, null);
+});
+
+test("view=commands: back and forward notify once per step", () => {
+  const { win, store, events } = commandsSetup("world=survival_two");
+  store.start();
+  store.setState({ view: "commands" }, { history: "push" });
+  events.length = 0;
+  win.navigate("world=survival_two", "popstate");
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0].meta.changed, ["view"]);
+  win.navigate("world=survival_two&view=commands", "popstate");
+  assert.equal(events.length, 2);
+  assert.equal(store.getState().view, "commands");
 });

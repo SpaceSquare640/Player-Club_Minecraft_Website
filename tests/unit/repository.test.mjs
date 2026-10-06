@@ -5,13 +5,14 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { CHANGELOG_KINDS, DataError, SUPPORTED_SCHEMA_VERSION, createRepository, errorView } from "../../site/js/data/repository.js";
 import { REPO_ROOT, SUPPORTED_SCHEMA_VERSION as SCRIPTS_SCHEMA_VERSION } from "../../scripts/lib/load-data.mjs";
-import { createDataset } from "../fixtures/dataset.mjs";
+import { addCommands, createDataset } from "../fixtures/dataset.mjs";
 import { createFakeFetch } from "../fixtures/front.mjs";
 
 const BASE = "https://example.test/site/data/";
 
-function routesFor(ds = createDataset()) {
+function routesFor(ds = addCommands(createDataset())) {
   return {
+    [`${BASE}commands/player_club.json`]: ds.commands.player_club,
     [`${BASE}manifest.json`]: ds.manifest,
     [`${BASE}config.json`]: ds.config,
     [`${BASE}editions.json`]: ds.editions,
@@ -177,4 +178,45 @@ test("the committed site/data loads through the repository", async () => {
   assert.equal(points[0].worldId, "player_club");
   assert.ok((await repo.loadChangelog("updates")).length >= 1);
   assert.ok((await repo.loadChangelog("points")).length >= 1);
+  const commands = await repo.loadCommands("builder_world");
+  assert.equal(commands.length, 22);
+  assert.equal(commands[0].id, "diamond_sword");
+});
+
+test("loadCommands: no-cache fetch on demand, frozen, cached per world, unsafe ids rejected", async () => {
+  const { fetch, requests } = createFakeFetch(routesFor());
+  const repo = createRepository({ baseUrl: BASE, fetch });
+  const commands = await repo.loadCommands("player_club");
+  assert.deepEqual(requests.map((r) => [r.url, r.init.cache]), [[`${BASE}commands/player_club.json`, "no-cache"]]);
+  assert.deepEqual(commands.map((c) => c.id), ["diamond_axe_fortune", "diamond_axe_silk_touch", "shield"]);
+  assert.ok(Object.isFrozen(commands) && Object.isFrozen(commands[0].label));
+  assert.equal(await repo.loadCommands("player_club"), commands);
+  assert.equal(requests.length, 1, "cached");
+  for (const bad of ["../config", "Player", "a", "", null, undefined]) {
+    assert.throws(() => repo.loadCommands(bad), TypeError, String(bad));
+  }
+});
+
+test("loadCommands: worldId, shape and schemaVersion are checked; a failure is not cached", async () => {
+  const load = (mutate) => {
+    const ds = addCommands(createDataset());
+    mutate(ds.commands.player_club);
+    return createRepository({ baseUrl: BASE, fetch: createFakeFetch(routesFor(ds)).fetch }).loadCommands("player_club");
+  };
+  await rejectsWith(load((file) => { file.worldId = "other"; }), "PARSE", "commands/player_club.json");
+  await rejectsWith(load((file) => { file.commands = {}; }), "PARSE", "commands/player_club.json");
+  await rejectsWith(load((file) => { file.schemaVersion = 2; }), "SCHEMA_VERSION", "commands/player_club.json");
+
+  let fail = true;
+  const inner = createFakeFetch(routesFor());
+  const repo = createRepository({
+    baseUrl: BASE,
+    fetch: async (url, init) => {
+      if (fail) throw new TypeError("offline");
+      return inner.fetch(url, init);
+    },
+  });
+  await rejectsWith(repo.loadCommands("player_club"), "NETWORK", "commands/player_club.json");
+  fail = false;
+  assert.equal((await repo.loadCommands("player_club")).length, 3);
 });

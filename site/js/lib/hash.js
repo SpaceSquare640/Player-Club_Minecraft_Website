@@ -12,10 +12,12 @@ import { codePointLength, stripControlChars } from "./text.js";
 
 export const TABS = ["points", "changelog"];
 export const LOGS = ["updates", "points"];
+/** Views of tab=points other than the point list: the Commands tab of worlds with commands: true. */
+export const VIEWS = ["commands"];
 export const MAX_HASH_LENGTH = 2048;
 export const MAX_QUERY_LENGTH = 100;
 /** Output order of keys; also the set of known keys. */
-export const HASH_KEYS = ["tab", "log", "world", "dim", "q", "tags", "point"];
+export const HASH_KEYS = ["tab", "log", "world", "view", "dim", "q", "tags", "point"];
 
 const findWorld = (ctx, worldId) => (ctx?.worlds ?? []).find((world) => world.id === worldId);
 
@@ -38,6 +40,7 @@ export function defaultState(ctx) {
     tab: "points",
     log: "updates",
     worldId,
+    view: null,
     dimension: defaultDimension(findWorld(ctx, worldId)),
     query: "",
     tagIds: [],
@@ -64,13 +67,15 @@ export function orderTagIds(tagIds, ctx) {
 }
 
 /**
- * Parses a location hash. Validation order: tab, log, world, point, dim, tags, q.
+ * Parses a location hash. Validation order: tab, log, world, point, view, dim, tags, q.
  * - Longer than 2048 characters: everything falls back to defaults.
  * - A leading "#" and "/" are tolerated; unknown keys are ignored; duplicate keys keep the first.
  * - Invalid world: default world, and dim / point are dropped.
  * - point needs tab=points, the standard form and a point of the current world; when valid it
  *   overrides dim and clears q and tags. If the world's points are not loaded yet, a well-formed
  *   point is kept and should be verified by parsing again after loading.
+ * - view=commands needs tab=points and a world with commands: true; a valid or pending point clears it.
+ *   dim, q and tags are kept (hidden while the Commands tab is shown) and validated as usual.
  * @returns {{ state: object, dropped: { key: string, value: string | null, reason: string }[] }}
  *   reason: tooLong | unknown | duplicate | invalid | notApplicable | notFound | cleared
  */
@@ -133,6 +138,14 @@ export function parseHash(hash, ctx) {
     }
   }
 
+  if (params.has("view")) {
+    if (!VIEWS.includes(params.get("view"))) drop("view", "invalid");
+    else if (!worldValid) drop("view", "cleared");
+    else if (state.tab !== "points" || world?.commands !== true) drop("view", "notApplicable");
+    else if (state.pointId) drop("view", "cleared");
+    else state.view = params.get("view");
+  }
+
   if (params.has("dim")) {
     const dim = params.get("dim");
     if (!worldValid) drop("dim", "cleared");
@@ -172,9 +185,9 @@ export function parseHash(hash, ctx) {
 
 /**
  * Serialises state to a hash without the leading "#" ("" when everything is default).
- * Defaults are omitted; key order is tab, log, world, dim, q, tags, point. Values use
+ * Defaults are omitted; key order is tab, log, world, view, dim, q, tags, point. Values use
  * encodeURIComponent (space as %20); tags are joined with an unencoded comma in tags.json order.
- * log is written only for tab=changelog and point only for tab=points.
+ * log is written only for tab=changelog; view and point only for tab=points.
  */
 export function serializeHash(state, ctx) {
   const parts = [];
@@ -184,6 +197,7 @@ export function serializeHash(state, ctx) {
   if (tab === "changelog" && state.log && state.log !== "updates") add("log", encodeURIComponent(state.log));
   const worldId = state.worldId ?? defaultWorldId(ctx);
   if (worldId && worldId !== defaultWorldId(ctx)) add("world", encodeURIComponent(worldId));
+  if (tab === "points" && VIEWS.includes(state.view)) add("view", encodeURIComponent(state.view));
   if (state.dimension && state.dimension !== defaultDimension(findWorld(ctx, worldId))) {
     add("dim", encodeURIComponent(state.dimension));
   }

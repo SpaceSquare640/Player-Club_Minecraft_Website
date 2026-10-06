@@ -9,7 +9,7 @@ const parse = (hash, c = ctx) => parseHash(hash, c);
 const reasons = (dropped) => dropped.map((d) => `${d.key}:${d.reason}`);
 
 test("empty hash and defaults", () => {
-  const expected = { tab: "points", log: "updates", worldId: "player_club", dimension: "overworld", query: "", tagIds: [], pointId: null };
+  const expected = { tab: "points", log: "updates", worldId: "player_club", view: null, dimension: "overworld", query: "", tagIds: [], pointId: null };
   assert.deepEqual(defaultState(ctx), expected);
   for (const hash of ["", "#", "#/", undefined]) {
     assert.deepEqual(parse(hash), { state: expected, dropped: [] });
@@ -21,7 +21,7 @@ test("architecture examples parse and serialise back unchanged", () => {
   const example = "world=survival_two&dim=the_nether&q=fortress&tags=base";
   const { state, dropped } = parse(`#${example}`);
   assert.deepEqual(dropped, []);
-  assert.deepEqual(state, { tab: "points", log: "updates", worldId: "survival_two", dimension: "the_nether", query: "fortress", tagIds: ["base"], pointId: null });
+  assert.deepEqual(state, { tab: "points", log: "updates", worldId: "survival_two", view: null, dimension: "the_nether", query: "fortress", tagIds: ["base"], pointId: null });
   assert.equal(serializeHash(state, ctx), example);
   assert.equal(serializeHash(parse("#tab=changelog&log=points").state, ctx), "tab=changelog&log=points");
   assert.equal(serializeHash(parse("#dim=the_nether&tags=nether_fortress,base").state, ctx), "dim=the_nether&tags=base,nether_fortress", "tags.json order");
@@ -202,4 +202,47 @@ test("many long tags: a hash of exactly 2048 characters is read, one character m
   const fallback = parseHash(`#${over}`, many);
   assert.deepEqual(fallback.state, defaultState(many));
   assert.deepEqual(reasons(fallback.dropped), ["*:tooLong"]);
+});
+
+// survival_two has commands: true; player_club has no commands.
+function commandsContext() {
+  const c = createHashContext();
+  c.worlds = c.worlds.map((w) => (w.id === "survival_two" ? { ...w, commands: true } : w));
+  return c;
+}
+
+test("view=commands: valid on a world with commands; dim, q and tags are kept in canonical order", () => {
+  const c = commandsContext();
+  const { state, dropped } = parse("#world=survival_two&view=commands", c);
+  assert.deepEqual(dropped, []);
+  assert.equal(state.view, "commands");
+  assert.equal(serializeHash(state, c), "world=survival_two&view=commands");
+
+  const full = "world=survival_two&view=commands&dim=the_nether&q=hub&tags=base";
+  const kept = parse(`#${full}`, c);
+  assert.deepEqual(kept.dropped, []);
+  assert.deepEqual(kept.state, { tab: "points", log: "updates", worldId: "survival_two", view: "commands", dimension: "the_nether", query: "hub", tagIds: ["base"], pointId: null });
+  assert.equal(serializeHash(kept.state, c), full);
+  assert.equal(serializeHash(parse("#tags=base&q=hub&dim=the_nether&view=commands&world=survival_two", c).state, c), full, "key order tab, log, world, view, dim, q, tags, point");
+  assert.deepEqual(parse(`#${serializeHash(kept.state, c)}`, c).state, kept.state, "parse(serialize) is stable");
+});
+
+test("view=commands: dropped without commands, on the change log, with a bad value, an invalid world or a point", () => {
+  const c = commandsContext();
+  const playerClub = parse("#view=commands", c);
+  assert.equal(playerClub.state.view, null);
+  assert.deepEqual(reasons(playerClub.dropped), ["view:notApplicable"]);
+  assert.deepEqual(reasons(parse("#tab=changelog&world=survival_two&view=commands", c).dropped), ["view:notApplicable"]);
+  assert.deepEqual(reasons(parse("#world=survival_two&view=list", c).dropped), ["view:invalid"]);
+  assert.deepEqual(reasons(parse("#world=nope&view=commands", c).dropped), ["world:invalid", "view:cleared"]);
+
+  const withPoint = parse("#world=survival_two&view=commands&point=p0003", c);
+  assert.equal(withPoint.state.pointId, "p0003");
+  assert.equal(withPoint.state.view, null);
+  assert.deepEqual(reasons(withPoint.dropped), ["view:cleared"]);
+  assert.doesNotMatch(serializeHash(withPoint.state, c), /view=/);
+  // A point that cannot be verified yet also wins; the next parse after loading decides again.
+  const pending = parse("#world=survival_two&view=commands&point=p0009", { ...c, points: {} });
+  assert.deepEqual([pending.state.pointId, pending.state.view], ["p0009", null]);
+  assert.equal(serializeHash({ ...defaultState(c), tab: "changelog", worldId: "survival_two", view: "commands" }, c), "tab=changelog&world=survival_two", "view only for tab=points");
 });

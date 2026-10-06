@@ -1,11 +1,12 @@
 // Single application state, kept in sync with the URL hash (lib/hash.js).
-// state: { tab, log, worldId, dimension, query, tagIds, pointId, lang }; lang is never written to the hash.
-// history option of setState: "push" (tab, change log sub-tab, world, dimension), "replace" (search,
+// state: { tab, log, worldId, view, dimension, query, tagIds, pointId, lang }; lang is never written to the hash.
+// view: null (point list) or "commands" (Commands tab).
+// history option of setState: "push" (tab, change log sub-tab, world, view, dimension), "replace" (search,
 // tags, canonical rewrites) or "none". Browser globals are read lazily through the win option.
 
 import { defaultState, parseHash, serializeHash } from "./lib/hash.js";
 
-export const HASH_FIELDS = ["tab", "log", "worldId", "dimension", "query", "tagIds", "pointId"];
+export const HASH_FIELDS = ["tab", "log", "worldId", "view", "dimension", "query", "tagIds", "pointId"];
 const FIELDS = [...HASH_FIELDS, "lang"];
 const HISTORY_MODES = ["push", "replace", "none"];
 
@@ -68,7 +69,7 @@ export function createStore({ win, ctx = null, lang = "en" } = {}) {
 
   /**
    * Applies a patch, normalises it and writes history.
-   * - World change: dimension resets to the world's first dimension and tags are cleared unless the patch sets them.
+   * - World change: dimension resets to the world's first dimension, and view and tags are cleared unless the patch sets them.
    * - Any hash field change clears pointId unless the patch sets it.
    * @returns {boolean} true when the state changed.
    */
@@ -78,6 +79,7 @@ export function createStore({ win, ctx = null, lang = "en" } = {}) {
     if (patch.worldId !== undefined && patch.worldId !== state.worldId) {
       if (!("dimension" in patch)) next.dimension = null;
       if (!("tagIds" in patch)) next.tagIds = [];
+      if (!("view" in patch)) next.view = null;
     }
     if (!("pointId" in patch) && HASH_FIELDS.some((key) => key !== "pointId" && !sameValue(next[key], state[key]))) {
       next.pointId = null;
