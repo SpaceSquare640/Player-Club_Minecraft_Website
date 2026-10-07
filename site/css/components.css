@@ -1049,6 +1049,23 @@
     scrollbar-width: none;
   }
 
+  /* The scrollbar is hidden, so an edge that hides tabs fades out (classes from dom.js
+     watchHorizontalOverflow; only while the strip overflows). */
+  .pc-tabs.has-overflow-start {
+    -webkit-mask-image: var(--pc-mask-fade-start);
+    mask-image: var(--pc-mask-fade-start);
+  }
+
+  .pc-tabs.has-overflow-end {
+    -webkit-mask-image: var(--pc-mask-fade-end);
+    mask-image: var(--pc-mask-fade-end);
+  }
+
+  .pc-tabs.has-overflow-start.has-overflow-end {
+    -webkit-mask-image: var(--pc-mask-fade-x);
+    mask-image: var(--pc-mask-fade-x);
+  }
+
   /* Four tabs (dimensions and Commands): names are not cut; spare width is shared. */
   .pc-tabs:not(.pc-tabs--sm) {
     grid-auto-columns: minmax(max-content, 1fr);

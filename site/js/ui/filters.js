@@ -3,7 +3,7 @@
 // never lose focus. Esc in the search box clears it when it has a value.
 
 import { plural, pick, t } from "../i18n.js";
-import { h, icon, replaceChildren } from "./dom.js";
+import { h, icon, replaceChildren, watchHorizontalOverflow } from "./dom.js";
 
 /**
  * @param {{ onInput: (query: string) => void, onClearQuery: () => void, onToggleTag: (tagId: string) => void,
@@ -63,9 +63,8 @@ export function createToolbar({ onInput, onClearQuery, onToggleTag, onClearAll, 
     summary,
   );
 
-  // Fade the chip row edges on phones only while it can actually scroll.
-  const updateScrollable = () => chips.classList.toggle("is-scrollable", chips.scrollWidth > chips.clientWidth + 1);
-  if (typeof ResizeObserver === "function") new ResizeObserver(updateScrollable).observe(chips);
+  // Fade the chip row edges on phones only while it can actually scroll (checked again after each render).
+  const updateScrollable = watchHorizontalOverflow(chips);
 
   function chipButton(id) {
     return h("button", {

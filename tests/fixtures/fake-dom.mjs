@@ -56,6 +56,11 @@ export class FakeElement {
       remove: (...remove) => {
         this.className = names().filter((n) => !remove.includes(n)).join(" ");
       },
+      toggle: (name, force) => {
+        const on = force === undefined ? !names().includes(name) : Boolean(force);
+        this.className = on ? [...new Set([...names(), name])].join(" ") : names().filter((n) => n !== name).join(" ");
+        return on;
+      },
       contains: (name) => names().includes(name),
     };
   }

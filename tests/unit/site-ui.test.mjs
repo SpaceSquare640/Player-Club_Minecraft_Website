@@ -195,6 +195,51 @@ test("CSS: token colour pairs of the design contrast table meet WCAG AA", () => 
   for (const [file, text] of Object.entries(css)) assert.doesNotMatch(text, /background(?:-color)?\s*:\s*var\(--pc-color-secondary(?:-hover)?\)/, file);
 });
 
+/** Contents of every @media block whose condition is exactly `query` (brace matched, comments removed). */
+function mediaBlocks(text, query) {
+  const source = text.replace(/\/\*[\s\S]*?\*\//g, "");
+  const blocks = [];
+  const head = `@media ${query} {`;
+  for (let at = source.indexOf(head); at >= 0; at = source.indexOf(head, at + 1)) {
+    let depth = 1;
+    let i = at + head.length;
+    for (; i < source.length && depth > 0; i += 1) {
+      if (source[i] === "{") depth += 1;
+      else if (source[i] === "}") depth -= 1;
+    }
+    blocks.push(source.slice(at + head.length, i - 1));
+  }
+  return blocks;
+}
+
+test("CSS: below 520px the tab strip scrolls inside itself and fades only an edge that hides tabs; the page never scrolls sideways", () => {
+  const components = css["css/components.css"].replace(/\/\*[\s\S]*?\*\//g, "");
+  const narrow = mediaBlocks(css["css/components.css"], "(max-width: 519px)").find((block) => /\n\s*\.pc-tabs \{/.test(block));
+  assert.ok(narrow, "a (max-width: 519px) block styles .pc-tabs");
+  assert.match(narrow, /\n\s*\.pc-tabs \{[^}]*overflow-x: auto;/);
+  for (const [selector, token] of [
+    [".pc-tabs.has-overflow-start", "start"],
+    [".pc-tabs.has-overflow-end", "end"],
+    [".pc-tabs.has-overflow-start.has-overflow-end", "x"],
+  ]) {
+    const rule = narrow.split("}").find((chunk) => chunk.trim().startsWith(`${selector} {`));
+    assert.ok(rule, selector);
+    const declarations = rule.slice(rule.indexOf("{") + 1).split(";").map((d) => d.trim()).filter(Boolean).sort();
+    assert.deepEqual(declarations, [`-webkit-mask-image: var(--pc-mask-fade-${token})`, `mask-image: var(--pc-mask-fade-${token})`], selector);
+  }
+  assert.doesNotMatch(components.replace(narrow, ""), /\.pc-tabs[^{}]*\{[^}]*mask-image/, "no tab fade outside the narrow layout");
+  for (const name of ["start", "end", "x"]) assert.ok(css["css/tokens.css"].includes(`--pc-mask-fade-${name}: linear-gradient(`), name);
+
+  // Only the tab strip and the filter chips scroll sideways; no page-level box clips or scrolls overflow,
+  // so a layout regression shows up as a real page scroll instead of being hidden.
+  const rules = Object.values(css).flatMap((text) => [...text.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{};]+)\{([^{}]*)\}/g)]);
+  const scrollingX = rules.filter((m) => /(?:^|[\s;])overflow-x\s*:/.test(m[2])).map((m) => m[1].trim());
+  assert.deepEqual([...new Set(scrollingX)].sort(), [".pc-chips", ".pc-tabs"]);
+  const page = rules.filter((m) => m[1].split(",").some((s) => /^(?:html|body|\.pc-app|\.pc-tabs-bar|main|\.pc-main)$/.test(s.trim())));
+  assert.ok(page.length >= 3, "html, body and .pc-app rules found");
+  for (const m of page) assert.doesNotMatch(m[2], /(?:^|[\s;])overflow(?:-x)?\s*:/, m[1].trim());
+});
+
 test("CSS: UI Verse adaptations keep their source notes; no text shadows or remote imports", () => {
   const components = css["css/components.css"];
   for (const [author, name] of [["chase2k25", "rare-quail-40"], ["elijahgummer", "kind-pig-24"], ["vinodjangid07", "wonderful-squid-57"]]) {

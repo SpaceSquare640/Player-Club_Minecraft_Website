@@ -13,6 +13,7 @@ import { DEFAULT_SETTINGS, buildCommand } from "../../site/js/lib/commands.js";
 import { createCommandsPanel } from "../../site/js/ui/commands-panel.js";
 import { createCopyButton, createFallbackHost, writeClipboard } from "../../site/js/ui/copy.js";
 import { createTabs } from "../../site/js/ui/dimension-tabs.js";
+import { createToolbar } from "../../site/js/ui/filters.js";
 import { createScope } from "../../site/js/ui/dom.js";
 import { initLive } from "../../site/js/ui/live.js";
 import { closeOpenMenu, createMenuButton } from "../../site/js/ui/menu.js";
@@ -600,4 +601,141 @@ test("commands panel: item names, variant names and the obfuscated hint follow t
   assert.equal(el.find(byId("pc-cmd-group-diamond_pickaxe_fortune")).textContent, "鑽石鎬");
   assert.equal(el.find(byId("pc-cmd-row-diamond_pickaxe_silk_touch-variant")).textContent, "精準採集");
   assert.equal(el.find(byId("pc-cmd-name-obfuscated")).textContent, zh.messages["commands.name.obfuscated"]);
+});
+
+// Tab strip on narrow screens (design spec 6 and 15): edge fades and scrolling a selected tab into view.
+
+const WORLD_TABS = [
+  { id: "overworld", label: "Overworld", shortLabel: "Overworld", count: 3 },
+  { id: "the_nether", label: "The Nether", shortLabel: "Nether", count: 1 },
+  { id: "the_end", label: "The End", shortLabel: "End", count: 0 },
+  { id: "commands", label: "Commands", shortLabel: "Commands", count: null },
+];
+
+/** Replaces a global (ResizeObserver, matchMedia) for one test and restores it afterwards. */
+function stubGlobal(t, name, value) {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  t.after(() => {
+    if (saved) Object.defineProperty(globalThis, name, saved);
+    else delete globalThis[name];
+  });
+}
+
+/**
+ * Tabs with a fake layout: a 296 px strip holding four tabs 326 px wide in total (Builder World at 320 px).
+ * ResizeObserver callbacks are collected so the test can fire them; scrollTo moves scrollLeft at once.
+ */
+function tabsFixture(t) {
+  const observers = [];
+  stubGlobal(t, "ResizeObserver", class {
+    constructor(fn) {
+      this.fn = fn;
+    }
+    observe(target) {
+      observers.push({ fn: this.fn, target });
+    }
+  });
+  let tabs;
+  const render = (id) => tabs.update(WORLD_TABS, id, "Dimensions");
+  tabs = createTabs({ idPrefix: "pc-dim-tab", panelId: "pc-tabpanel", onSelect: render });
+  const strip = tabs.el;
+  const scrolls = [];
+  const pageScrolls = [];
+  Object.assign(strip, { scrollWidth: 326, clientWidth: 296, scrollLeft: 0 });
+  strip.scrollTo = (options) => {
+    scrolls.push(options);
+    strip.scrollLeft = options.left;
+  };
+  const widths = [96, 80, 60, 90];
+  strip.getBoundingClientRect = () => ({ left: 0, right: 296, top: 0, bottom: 52, width: 296, height: 52 });
+  const layout = () => {
+    let x = -strip.scrollLeft;
+    tabs.el.children.forEach((button, i) => {
+      const left = x;
+      button.getBoundingClientRect = () => ({ left, right: left + widths[i], top: 0, bottom: 52, width: widths[i], height: 52 });
+      button.scrollIntoView = () => pageScrolls.push(button);
+      x += widths[i];
+    });
+  };
+  mount(t, strip);
+  const resize = () => observers.filter((o) => o.target === strip).forEach((o) => o.fn([]));
+  const button = (id) => strip.find(byId(`pc-dim-tab-${id}`));
+  const select = (id) => {
+    layout();
+    render(id);
+  };
+  return { tabs, strip, scrolls, pageScrolls, select, resize, button, layout, render };
+}
+
+const stateOf = (strip) => ["is-scrollable", "has-overflow-start", "has-overflow-end"].filter((name) => strip.classList.contains(name));
+
+test("tab strip: state classes only while it overflows, fading the edge that hides tabs", (t) => {
+  const { strip, render, resize } = tabsFixture(t);
+  render("overworld");
+  assert.deepEqual(stateOf(strip), ["is-scrollable", "has-overflow-end"], "at the start only the right edge hides a tab");
+  strip.scrollLeft = 15;
+  strip.dispatch("scroll");
+  assert.deepEqual(stateOf(strip), ["is-scrollable", "has-overflow-start", "has-overflow-end"]);
+  strip.scrollLeft = 30;
+  strip.dispatch("scroll");
+  assert.deepEqual(stateOf(strip), ["is-scrollable", "has-overflow-start"], "at the end only the left edge fades");
+
+  strip.clientWidth = 400; // wider screen: everything fits
+  resize();
+  assert.deepEqual(stateOf(strip), []);
+  strip.clientWidth = 296;
+  strip.scrollLeft = 0;
+  render("overworld"); // a re-render (for example new labels) checks again
+  assert.deepEqual(stateOf(strip), ["is-scrollable", "has-overflow-end"]);
+});
+
+test("tab strip: a newly selected tab is scrolled into view inside the strip, smooth unless reduced motion", async (t) => {
+  let reduced = false;
+  stubGlobal(t, "matchMedia", (query) => ({ media: query, matches: reduced }));
+  const { strip, scrolls, pageScrolls, select, button, layout, render } = tabsFixture(t);
+  select("overworld");
+  assert.deepEqual(scrolls, [], "the first tab is already in view");
+
+  select("commands"); // click or hash change: Commands is partly hidden on the right
+  assert.deepEqual(scrolls, [{ left: 30, behavior: "smooth" }], "only the strip scrolls, never the page (no top)");
+  strip.scrollLeft = 0; // the user scrolls the strip back by hand
+  layout();
+  render("commands");
+  assert.equal(scrolls.length, 1, "re-rendering the same tab does not scroll a strip the user moved");
+
+  reduced = true;
+  strip.scrollLeft = 30;
+  layout();
+  button("commands").focus();
+  button("commands").dispatch("keydown", { key: "Home" }); // keyboard selection through onSelect
+  assert.equal(document.activeElement, button("overworld"));
+  assert.deepEqual(scrolls.at(-1), { left: 0, behavior: "auto" }, "reduced motion jumps");
+  assert.deepEqual(pageScrolls, [], "scrollIntoView is never used, so the page does not move");
+});
+
+test("tab strip: a size change keeps the selected tab in view without animation; no layout means no scroll", (t) => {
+  const { strip, scrolls, render, resize, layout } = tabsFixture(t);
+  const saved = strip.getBoundingClientRect;
+  strip.getBoundingClientRect = () => ({ left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 });
+  render("commands"); // hash on load: the strip has no layout yet
+  assert.deepEqual(scrolls, []);
+  strip.getBoundingClientRect = saved;
+  layout();
+  resize(); // first layout
+  assert.deepEqual(scrolls, [{ left: 30, behavior: "auto" }]);
+});
+
+test("filter chips share the strip state: is-scrollable follows a re-render of the chips", (t) => {
+  const toolbar = createToolbar({ onInput() {}, onClearQuery() {}, onToggleTag() {}, onClearAll() {}, onSubmit() {} });
+  mount(t, toolbar.el);
+  const chips = toolbar.el.find(byClass("pc-chips"));
+  Object.assign(chips, { scrollWidth: 500, clientWidth: 343, scrollLeft: 0 });
+  const filters = ["farm", "base", "portal"].map((id, i) => ({ id, tag: { name: { en: id } }, count: i, selected: false, disabled: false }));
+  const view = { query: "", filters, hasPoints: true, summary: { key: "commands.tab", plural: false, params: {} }, showClearAll: false, showSummary: true };
+  toolbar.update(view);
+  assert.deepEqual(stateOf(chips), ["is-scrollable", "has-overflow-end"]);
+  chips.scrollWidth = 343;
+  toolbar.update(view);
+  assert.deepEqual(stateOf(chips), []);
 });

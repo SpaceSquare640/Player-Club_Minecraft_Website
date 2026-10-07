@@ -98,3 +98,23 @@ export function externalLink(href, className, label, newTabText, { iconName = "e
 export function prefersReducedMotion() {
   return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
+
+/**
+ * Horizontal scroll strip state as classes (no inline styles, CSP): is-scrollable while the content is
+ * wider than the box, has-overflow-start / has-overflow-end while content is hidden on that side. CSS
+ * uses them for edge fades. Updated on resize and scroll; call the returned function after a re-render.
+ * @param {HTMLElement} el
+ * @returns {() => void}
+ */
+export function watchHorizontalOverflow(el) {
+  const update = () => {
+    const max = el.scrollWidth - el.clientWidth;
+    const scrollable = max > 1;
+    el.classList.toggle("is-scrollable", scrollable);
+    el.classList.toggle("has-overflow-start", scrollable && el.scrollLeft > 1);
+    el.classList.toggle("has-overflow-end", scrollable && el.scrollLeft < max - 1);
+  };
+  if (typeof ResizeObserver === "function") new ResizeObserver(update).observe(el);
+  el.addEventListener("scroll", update, { passive: true });
+  return update;
+}

@@ -63,6 +63,8 @@
   --pc-gradient-brand: linear-gradient(90deg, #38d9ff, #b46cff); /* wordmark only */
   --pc-gradient-skeleton: linear-gradient(90deg, #0f1320, #151b2c, #0f1320);
   --pc-mask-fade-x: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  --pc-mask-fade-start: linear-gradient(to right, transparent, #000 16px);
+  --pc-mask-fade-end: linear-gradient(to right, #000 calc(100% - 16px), transparent);
 
   /* Type (5 sizes) */
   --pc-font-sans: system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
