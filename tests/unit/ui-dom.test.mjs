@@ -19,7 +19,7 @@ import { closeOpenMenu, createMenuButton } from "../../site/js/ui/menu.js";
 import { renderSpawnCard } from "../../site/js/ui/spawn-card.js";
 import { renderWorldInfo } from "../../site/js/ui/world-info.js";
 import { createDataset } from "../fixtures/dataset.mjs";
-import { installFakeDom } from "../fixtures/fake-dom.mjs";
+import { FakeElement, installFakeDom } from "../fixtures/fake-dom.mjs";
 import { createFakeFetch } from "../fixtures/front.mjs";
 
 const readDict = async (lang) => JSON.parse(await readFile(path.join(REPO_ROOT, "site/i18n", `${lang}.json`), "utf8"));
@@ -497,6 +497,69 @@ test("commands panel: copy buttons copy the current command; failure shows the s
   assert.equal(fallback.find(isInput).value, SHIELD_DEFAULT);
   type("Ex");
   assert.equal(fallback.hidden, true, "a settings change closes the stale fallback field");
+});
+
+test("commands panel: in command block mode a copy writes the shown command with the typed name; a failure shows the same text", async (t) => {
+  const { el, codes, copies, type, setMode } = commandsFixture(t);
+  type("Ex");
+  setMode("block");
+  const expected = buildCommand(COMMANDS.find((entry) => entry.id === "shield"), { mode: "block", name: "Ex" });
+  const shown = codes()[15].textContent;
+  assert.equal(shown, expected);
+  const written = [];
+  await withNavigator({ clipboard: { writeText: async (text) => written.push(text) } }, () => copies()[15].click());
+  assert.deepEqual(written, [expected]);
+  assert.ok(written[0].startsWith('/give @p shield[custom_name={text:"Ex",'), "the copy uses the current mode and name");
+
+  await withNavigator({}, () => copies()[15].click());
+  const fallback = el.find(byId("pc-cmd-row-shield")).find(byClass("pc-copy-fallback-host"));
+  assert.equal(fallback.hidden, false);
+  assert.equal(fallback.find(isInput).value, shown, "the manual-copy field holds the displayed command");
+});
+
+test("commands panel: each comma of a command is followed by one line break hint, and only commas are", (t) => {
+  const { codes, type, setMode } = commandsFixture(t);
+  const check = (label) => {
+    for (const code of codes()) {
+      const text = code.textContent;
+      const nodes = code.children;
+      const breaks = nodes.filter((n) => n.tagName === "WBR");
+      assert.ok(breaks.length > 0, `${label}: ${text}`);
+      assert.equal(breaks.length, (text.match(/,/g) ?? []).length, `${label}: ${text}`);
+      nodes.forEach((n, i) => {
+        if (n.tagName !== "WBR") return;
+        const before = nodes[i - 1];
+        assert.ok(before && before.tagName === undefined && before.textContent.endsWith(","), `${label}: break ${i} follows a comma`);
+      });
+    }
+  };
+  check("default");
+  type("Ex, Calibur");
+  setMode("block");
+  check("name with a comma");
+});
+
+test("commands panel: the name hint fills {max} and {placeholder}; no text in the panel shows a raw {param}", async (t) => {
+  const textsOf = (node) => node.children.flatMap((c) => (c instanceof FakeElement ? [c.ownText, ...textsOf(c)] : [c.textContent]));
+  const checkPanel = (lang) => {
+    const { el } = commandsFixture(t);
+    const hint = el.find(byId("pc-cmd-name-hint")).textContent;
+    assert.ok(hint.includes("input the name you want"), `${lang}: ${hint}`);
+    assert.ok(hint.includes("50"), `${lang}: ${hint}`);
+    assert.ok(!hint.includes("{"), `${lang}: ${hint}`);
+    const raw = [el.ownText, ...textsOf(el)].filter((text) => /\{[A-Za-z0-9_]+\}/.test(text));
+    assert.deepEqual(raw, [], `${lang}: unfilled parameters`);
+  };
+  checkPanel("en");
+  const savedFetch = globalThis.fetch;
+  globalThis.fetch = createFakeFetch({ "i18n/zh-TW.json": await readDict("zh-TW") }).fetch;
+  try {
+    await setLang("zh-TW");
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
+  t.after(() => setLang("en"));
+  checkPanel("zh-TW");
 });
 
 test("commands panel: the notice, the guide state, the mode and the typed name survive a rebuild", (t) => {
