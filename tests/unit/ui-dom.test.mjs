@@ -14,7 +14,7 @@ import { createCommandsPanel } from "../../site/js/ui/commands-panel.js";
 import { createCopyButton, createFallbackHost, writeClipboard } from "../../site/js/ui/copy.js";
 import { createTabs } from "../../site/js/ui/dimension-tabs.js";
 import { createToolbar } from "../../site/js/ui/filters.js";
-import { createScope } from "../../site/js/ui/dom.js";
+import { createScope, watchHorizontalOverflow } from "../../site/js/ui/dom.js";
 import { initLive } from "../../site/js/ui/live.js";
 import { closeOpenMenu, createMenuButton } from "../../site/js/ui/menu.js";
 import { renderSpawnCard } from "../../site/js/ui/spawn-card.js";
@@ -623,10 +623,11 @@ function stubGlobal(t, name, value) {
 }
 
 /**
- * Tabs with a fake layout: a 296 px strip holding four tabs 326 px wide in total (Builder World at 320 px).
- * ResizeObserver callbacks are collected so the test can fire them; scrollTo moves scrollLeft at once.
+ * Tabs with a fake layout: a 296 px strip holding four tabs 326 px wide in total (Builder World at 320 px),
+ * or the given tab widths. ResizeObserver callbacks are collected so the test can fire them; scrollTo moves
+ * scrollLeft at once.
  */
-function tabsFixture(t) {
+function tabsFixture(t, { widths = [96, 80, 60, 90] } = {}) {
   const observers = [];
   stubGlobal(t, "ResizeObserver", class {
     constructor(fn) {
@@ -642,12 +643,11 @@ function tabsFixture(t) {
   const strip = tabs.el;
   const scrolls = [];
   const pageScrolls = [];
-  Object.assign(strip, { scrollWidth: 326, clientWidth: 296, scrollLeft: 0 });
+  Object.assign(strip, { scrollWidth: widths.reduce((sum, w) => sum + w, 0), clientWidth: 296, scrollLeft: 0 });
   strip.scrollTo = (options) => {
     scrolls.push(options);
     strip.scrollLeft = options.left;
   };
-  const widths = [96, 80, 60, 90];
   strip.getBoundingClientRect = () => ({ left: 0, right: 296, top: 0, bottom: 52, width: 296, height: 52 });
   const layout = () => {
     let x = -strip.scrollLeft;
@@ -718,12 +718,82 @@ test("tab strip: a size change keeps the selected tab in view without animation;
   const { strip, scrolls, render, resize, layout } = tabsFixture(t);
   const saved = strip.getBoundingClientRect;
   strip.getBoundingClientRect = () => ({ left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 });
-  render("commands"); // hash on load: the strip has no layout yet
+  // Hash on load: the strip has no layout yet (tab rectangles at 0). Without the zero-width guard the
+  // tab would look hidden on the left and the strip would scroll back from 30.
+  strip.scrollLeft = 30;
+  render("commands");
   assert.deepEqual(scrolls, []);
+  assert.equal(strip.scrollLeft, 30);
+  strip.scrollLeft = 0;
   strip.getBoundingClientRect = saved;
   layout();
   resize(); // first layout
   assert.deepEqual(scrolls, [{ left: 30, behavior: "auto" }]);
+});
+
+test("tab strip: a revealed tab stops exactly one edge fade (16 px) clear of the edge it was hidden behind", (t) => {
+  // 600 px of tabs in the 296 px strip, so the scroll range (0 to 304) never clamps the result.
+  const { strip, scrolls, select, button } = tabsFixture(t, { widths: [120, 200, 160, 120] });
+  select("overworld");
+  assert.deepEqual(scrolls, []);
+
+  select("the_nether"); // 120 to 320: partly hidden on the right
+  assert.deepEqual(scrolls.at(-1), { left: 40, behavior: "smooth" });
+  select("the_nether"); // layout again at the new scroll position (same tab: no new scroll)
+  assert.equal(button("the_nether").getBoundingClientRect().right, 296 - 16);
+
+  strip.scrollLeft = 150;
+  select("the_end"); // 320 to 480, shown at 170 to 330: partly hidden on the right
+  assert.deepEqual(scrolls.at(-1), { left: 200, behavior: "smooth" });
+  assert.equal(scrolls.length, 2);
+
+  strip.scrollLeft = 150;
+  select("the_nether"); // 120 to 320, shown at -30 to 170: partly hidden on the left
+  assert.deepEqual(scrolls.at(-1), { left: 104, behavior: "smooth" });
+  select("the_nether");
+  assert.equal(button("the_nether").getBoundingClientRect().left, 16);
+
+  strip.scrollLeft = 110;
+  select("the_end"); // shown at 210 to 370
+  strip.scrollLeft = 300;
+  select("the_nether"); // shown at -180 to 20: almost all hidden on the left
+  assert.deepEqual(scrolls.at(-1), { left: 104, behavior: "smooth" });
+});
+
+test("strip state: is-scrollable needs more than 1 px of overflow; each edge has the same 1 px tolerance", () => {
+  const el = document.createElement("div");
+  Object.assign(el, { scrollWidth: 297, clientWidth: 296, scrollLeft: 0 });
+  const refresh = watchHorizontalOverflow(el);
+  refresh();
+  assert.deepEqual(stateOf(el), [], "1 px of overflow is rounding, not scrolling");
+  el.scrollWidth = 298;
+  refresh();
+  assert.deepEqual(stateOf(el), ["is-scrollable", "has-overflow-end"]);
+
+  Object.assign(el, { scrollWidth: 326, scrollLeft: 1 });
+  refresh();
+  assert.deepEqual(stateOf(el), ["is-scrollable", "has-overflow-end"], "1 px from the start still counts as the start");
+  el.scrollLeft = 2;
+  refresh();
+  assert.deepEqual(stateOf(el), ["is-scrollable", "has-overflow-start", "has-overflow-end"]);
+  el.scrollLeft = 29;
+  refresh();
+  assert.deepEqual(stateOf(el), ["is-scrollable", "has-overflow-start"], "1 px from the end still counts as the end");
+  el.scrollLeft = 28;
+  refresh();
+  assert.deepEqual(stateOf(el), ["is-scrollable", "has-overflow-start", "has-overflow-end"]);
+});
+
+test("strip state: the scroll listener is passive, so it never delays scrolling", () => {
+  const el = document.createElement("div");
+  Object.assign(el, { scrollWidth: 326, clientWidth: 296, scrollLeft: 0 });
+  watchHorizontalOverflow(el);
+  const listeners = el.listeners.get("scroll") ?? [];
+  assert.equal(listeners.length, 1);
+  assert.deepEqual(listeners[0].options, { passive: true });
+  el.scrollLeft = 30;
+  el.dispatch("scroll");
+  assert.deepEqual(stateOf(el), ["is-scrollable", "has-overflow-start"]);
 });
 
 test("filter chips share the strip state: is-scrollable follows a re-render of the chips", (t) => {

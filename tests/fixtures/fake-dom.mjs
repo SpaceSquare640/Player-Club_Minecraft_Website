@@ -10,7 +10,8 @@ const captureOf = (options) => (typeof options === "boolean" ? options : Boolean
 function addListener(map, type, fn, options) {
   const capture = captureOf(options);
   const list = map.get(type) ?? [];
-  if (!list.some((l) => l.fn === fn && l.capture === capture)) map.set(type, [...list, { fn, capture }]);
+  // The options are kept as given, so a test can check flags such as passive.
+  if (!list.some((l) => l.fn === fn && l.capture === capture)) map.set(type, [...list, { fn, capture, options }]);
 }
 
 function removeListener(map, type, fn, options) {

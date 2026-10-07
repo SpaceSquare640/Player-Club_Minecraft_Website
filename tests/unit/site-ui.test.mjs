@@ -240,6 +240,25 @@ test("CSS: below 520px the tab strip scrolls inside itself and fades only an edg
   for (const m of page) assert.doesNotMatch(m[2], /(?:^|[\s;])overflow(?:-x)?\s*:/, m[1].trim());
 });
 
+test("CSS: the edge fade tokens fade the hidden side only, as wide as the margin the tab reveal keeps (EDGE_FADE_PX)", async () => {
+  const tabsSource = await read("js/ui/dimension-tabs.js");
+  const px = Number(/\bconst EDGE_FADE_PX = (\d+);/.exec(tabsSource)?.[1]);
+  assert.equal(px, 16, "dimension-tabs.js EDGE_FADE_PX");
+  const tokens = css["css/tokens.css"];
+  const token = (name) => new RegExp(`--pc-mask-fade-${name}: ([^;]+);`).exec(tokens)?.[1];
+  assert.equal(token("start"), `linear-gradient(to right, transparent, #000 ${px}px)`, "start: transparent on the left only");
+  assert.equal(token("end"), `linear-gradient(to right, #000 calc(100% - ${px}px), transparent)`, "end: transparent on the right only");
+  assert.equal(token("x"), `linear-gradient(to right, transparent, #000 ${px}px, #000 calc(100% - ${px}px), transparent)`, "x: both sides");
+
+  // The filter chips fade both sides on phones while they can scroll (class from watchHorizontalOverflow).
+  const phone = mediaBlocks(css["css/components.css"], "(max-width: 767px)").find((block) => /\n\s*\.pc-chips \{/.test(block));
+  assert.ok(phone, "a (max-width: 767px) block styles .pc-chips");
+  const rule = phone.split("}").find((chunk) => chunk.trim().startsWith(".pc-chips.is-scrollable {"));
+  assert.ok(rule, ".pc-chips.is-scrollable");
+  const declarations = rule.slice(rule.indexOf("{") + 1).split(";").map((d) => d.trim()).filter(Boolean).sort();
+  assert.deepEqual(declarations, ["-webkit-mask-image: var(--pc-mask-fade-x)", "mask-image: var(--pc-mask-fade-x)"]);
+});
+
 test("CSS: UI Verse adaptations keep their source notes; no text shadows or remote imports", () => {
   const components = css["css/components.css"];
   for (const [author, name] of [["chase2k25", "rare-quail-40"], ["elijahgummer", "kind-pig-24"], ["vinodjangid07", "wonderful-squid-57"]]) {
