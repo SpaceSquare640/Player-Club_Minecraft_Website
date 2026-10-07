@@ -274,7 +274,7 @@ test("commands file rejects missing, extra and malformed fields", () => {
     return isValid("commands", file);
   };
   assert.equal(check(() => {}), true);
-  assert.equal(check((_, c) => { delete c.count; }), false, "count is required");
+  assert.equal(check((_, c) => { delete c.count; }), true, "count may be omitted");
   assert.equal(check((_, c) => { c.command = "/give @p shield"; }), false, "extra key command");
   assert.equal(check((_, c) => { c.custom_name = "x"; }), false, "extra key custom_name");
   assert.equal(check((_, c) => { c.id = "Shield"; }), false, "upper-case id");
@@ -284,7 +284,7 @@ test("commands file rejects missing, extra and malformed fields", () => {
   for (const ench of ["{}", "unbreaking:3", "{unbreaking:3 }", "{unbreaking:03}", "{unbreaking:0}", '{"unbreaking":3}', "{unbreaking:3}],custom_name=x", "{unbreaking:1000}", `{${"a".repeat(64)}:1${",b:1".repeat(250)}}`]) {
     assert.equal(check((_, c) => { c.enchantments = ench; }), false, ench.slice(0, 40));
   }
-  for (const count of [0, 65, 1.5, "1"]) {
+  for (const count of [0, 65, 1.5, "1", null]) {
     assert.equal(check((_, c) => { c.count = count; }), false, String(count));
   }
   assert.equal(check((_, c) => { c.count = 64; }), true, "count 64");

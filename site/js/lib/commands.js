@@ -1,24 +1,18 @@
 // Minecraft /give commands of the Commands tab; not the Issue comment commands of scripts/lib/commands.mjs.
 // Pure functions shared by the site and the cross validation (X25): no DOM and no browser globals.
-// Data files store only the item, the enchantments (SNBT map text) and the count; the custom name and
-// the target selector are built here from five settings that live only in page memory.
-// Syntax: Java Edition 1.21.5 or later (custom_name as an SNBT text component list).
+// Data files store only the item, the enchantments (SNBT map text) and an optional count; the custom name
+// and the target selector are built here from two settings (usage mode, name) that live only in page memory.
+// Syntax: Java Edition 1.21.5 or later (custom_name as an SNBT text component).
 
 import { codePointLength, stripControlChars } from "./text.js";
 
-/** Middle text when the name is empty; also the placeholder of the name input. */
+/** Name text when the name is empty; also the placeholder of the name input. */
 export const NAME_PLACEHOLDER = "input the name you want";
 /** Name limit in code points, like renaming in an anvil. */
 export const MAX_NAME_LENGTH = 50;
 /** Usage modes: a command block has no @s target, so it uses the nearest player. */
 export const MODES = Object.freeze([Object.freeze({ id: "block", selector: "@p" }), Object.freeze({ id: "chat", selector: "@s" })]);
-export const SYMBOLS = Object.freeze(["X", "***", "###"]);
-/** Minecraft named text colours in the game's order. */
-export const COLORS = Object.freeze([
-  "black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray",
-  "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white",
-]);
-export const DEFAULT_SETTINGS = Object.freeze({ mode: "block", name: "", symbols: "###", symbolColor: "gold", nameColor: "yellow" });
+export const DEFAULT_SETTINGS = Object.freeze({ mode: "chat", name: "" });
 /** Java Edition chat accepts at most 256 characters (UTF-16 length); longer pastes are cut off. */
 export const CHAT_COMMAND_LIMIT = 256;
 
@@ -82,23 +76,14 @@ export function escapeSnbtString(text) {
   return String(text).replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
-const pickAllowed = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
-
 /**
- * Settings checked against the whitelists by strict equality (no trimming, no case folding);
- * anything else falls back to the default value.
- * @returns {{ mode: string, selector: string, name: string, symbols: string, symbolColor: string, nameColor: string }}
+ * Settings: the mode is checked against MODES by strict equality (no trimming, no case folding) and
+ * falls back to the default; the name goes through sanitizeName.
+ * @returns {{ mode: string, selector: string, name: string }}
  */
 export function normalizeSettings(raw) {
   const mode = MODES.find((m) => m.id === raw?.mode) ?? MODES.find((m) => m.id === DEFAULT_SETTINGS.mode);
-  return {
-    mode: mode.id,
-    selector: mode.selector,
-    name: sanitizeName(raw?.name).name,
-    symbols: pickAllowed(raw?.symbols, SYMBOLS, DEFAULT_SETTINGS.symbols),
-    symbolColor: pickAllowed(raw?.symbolColor, COLORS, DEFAULT_SETTINGS.symbolColor),
-    nameColor: pickAllowed(raw?.nameColor, COLORS, DEFAULT_SETTINGS.nameColor),
-  };
+  return { mode: mode.id, selector: mode.selector, name: sanitizeName(raw?.name).name };
 }
 
 /** True when an entry can be turned into a command (same limits as the schema). */
@@ -113,9 +98,7 @@ export function isCommandEntry(entry) {
     typeof entry.enchantments === "string" &&
     entry.enchantments.length <= MAX_ENCHANTMENTS_LENGTH &&
     ENCHANTMENTS_RE.test(entry.enchantments) &&
-    Number.isInteger(entry.count) &&
-    entry.count >= 1 &&
-    entry.count <= MAX_COUNT &&
+    (entry.count === undefined || (Number.isInteger(entry.count) && entry.count >= 1 && entry.count <= MAX_COUNT)) &&
     typeof entry.label?.en === "string" &&
     entry.label.en !== ""
   );
@@ -137,32 +120,18 @@ export function parseEnchantments(text) {
 }
 
 /**
- * The command in three parts around the name, so the page can mark the name; before + name + after
- * is the whole command. This is the only definition of the command layout. The name is joined by
- * concatenation and never goes through String.prototype.replace, so "$&" and setting-like text stay as typed.
- * italic:false belongs to the first segment only (later segments inherit it); the middle segment
- * needs obfuscated:false, otherwise the name is obfuscated too.
- * @returns {{ before: string, name: string, after: string, placeholder: boolean }}
+ * Full /give command for an entry and the current settings (shown and copied as is). This is the only
+ * definition of the command layout, the same as the owner's command list except that obfuscated is
+ * always false (players change it to true by hand). The name is joined by concatenation and never goes
+ * through String.prototype.replace, so "$&" and setting-like text stay as typed. Without a count the
+ * command ends at "]" (the game gives one item).
  */
-export function commandParts(entry, settings) {
+export function buildCommand(entry, settings) {
   if (!isCommandEntry(entry)) throw new TypeError(`Invalid command entry: ${entry?.id}`);
   const s = normalizeSettings(settings);
-  const placeholder = s.name === "";
-  const before =
-    `/give ${s.selector} ${entry.item}[custom_name=[` +
-    `{text:"${s.symbols}",obfuscated:true,color:"${s.symbolColor}",italic:false},` +
-    `{text:" `;
-  const after =
-    ` ",obfuscated:false,color:"${s.nameColor}"},` +
-    `{text:"${s.symbols}",obfuscated:true,color:"${s.symbolColor}"}],` +
-    `enchantments=${entry.enchantments}] ${entry.count}`;
-  return { before, name: placeholder ? NAME_PLACEHOLDER : escapeSnbtString(s.name), after, placeholder };
-}
-
-/** Full /give command for an entry and the current settings (shown and copied as is). */
-export function buildCommand(entry, settings) {
-  const { before, name, after } = commandParts(entry, settings);
-  return before + name + after;
+  const name = s.name === "" ? NAME_PLACEHOLDER : escapeSnbtString(s.name);
+  const count = entry.count === undefined ? "" : ` ${entry.count}`;
+  return `/give ${s.selector} ${entry.item}[custom_name={text:"${name}",obfuscated:false},enchantments=${entry.enchantments}]${count}`;
 }
 
 /** Adjacent entries with the same item form one group: [{ item, label, entries }]. */

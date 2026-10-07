@@ -103,7 +103,8 @@ test("Builder World commands: only Builder World has the flag; 22 commands in 16
 
   const { commands } = dataset.commands.builder_world;
   assert.deepEqual(commands.map((c) => c.id), COMMAND_IDS);
-  assert.ok(commands.every((c) => c.count === 1));
+  // Counts follow the command list: the bow has none, every other command gives 1.
+  assert.ok(commands.every((c) => (c.id === "bow" ? !Object.hasOwn(c, "count") : c.count === 1)));
   // Adjacent commands of one item form a group.
   const sizes = [];
   commands.forEach((c, i) => {

@@ -1,0 +1,22 @@
+/give @s diamond_sword[custom_name={text:"input the name you want",obfuscated:true},enchantments={sweeping_edge:3,sharpness:5,knockback:2,fire_aspect:2,looting:3,unbreaking:3,mending:1,smite:5,bane_of_arthropods:5,vanishing_curse:1}] 1
+/give @s bow[custom_name={text:"input the name you want",obfuscated:true},enchantments={unbreaking:3,power:5,punch:2,flame:1,infinity:1,mending:1,vanishing_curse:1}]
+/give @s crossbow[custom_name={text:"input the name you want",obfuscated:true},enchantments={multishot:1,piercing:4,quick_charge:3,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s trident[custom_name={text:"input the name you want",obfuscated:true},enchantments={unbreaking:3,loyalty:3,impaling:5,channeling:1,mending:1,vanishing_curse:1}] 1
+/give @s trident[custom_name={text:"input the name you want",obfuscated:true},enchantments={unbreaking:3,loyalty:3,impaling:5,riptide:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_axe[custom_name={text:"input the name you want",obfuscated:true},enchantments={sharpness:5,efficiency:5,unbreaking:3,fortune:3,mending:1,smite:5,bane_of_arthropods:5,vanishing_curse:1}] 1
+/give @s diamond_axe[custom_name={text:"input the name you want",obfuscated:true},enchantments={sharpness:5,efficiency:5,unbreaking:3,silk_touch:1,mending:1,smite:5,bane_of_arthropods:5,vanishing_curse:1}] 1
+/give @s diamond_hoe[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,fortune:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_hoe[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,silk_touch:1,mending:1,vanishing_curse:1}] 1
+/give @s diamond_pickaxe[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,fortune:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_pickaxe[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,silk_touch:1,mending:1,vanishing_curse:1}] 1
+/give @s diamond_shovel[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,fortune:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_shovel[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,silk_touch:1,mending:1,vanishing_curse:1}] 1
+/give @s fishing_rod[custom_name={text:"input the name you want",obfuscated:true},enchantments={unbreaking:3,luck_of_the_sea:3,lure:3,mending:1,vanishing_curse:1}] 1
+/give @s shears[custom_name={text:"input the name you want",obfuscated:true},enchantments={efficiency:5,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s shield[custom_name={text:"input the name you want",obfuscated:true},enchantments={unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s elytra[custom_name={text:"input the name you want",obfuscated:true},enchantments={blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_helmet[custom_name={text:"input the name you want",obfuscated:true},enchantments={respiration:3,aqua_affinity:1,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_chestplate[custom_name={text:"input the name you want",obfuscated:true},enchantments={blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_leggings[custom_name={text:"input the name you want",obfuscated:true},enchantments={swift_sneak:3,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_boots[custom_name={text:"input the name you want",obfuscated:true},enchantments={soul_speed:3,feather_falling:4,depth_strider:3,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}] 1
+/give @s diamond_boots[custom_name={text:"input the name you want",obfuscated:true},enchantments={soul_speed:3,feather_falling:4,frost_walker:2,blast_protection:4,fire_protection:4,projectile_protection:4,protection:4,thorns:3,unbreaking:3,mending:1,vanishing_curse:1}] 1

@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { REPO_ROOT } from "../../scripts/lib/load-data.mjs";
 import { initI18n, setLang } from "../../site/js/i18n.js";
-import { COLORS, DEFAULT_SETTINGS, SYMBOLS, buildCommand } from "../../site/js/lib/commands.js";
+import { DEFAULT_SETTINGS, buildCommand } from "../../site/js/lib/commands.js";
 import { createCommandsPanel } from "../../site/js/ui/commands-panel.js";
 import { createCopyButton, createFallbackHost, writeClipboard } from "../../site/js/ui/copy.js";
 import { createTabs } from "../../site/js/ui/dimension-tabs.js";
@@ -324,8 +324,8 @@ test("world info: int64 seeds are shown and copied exactly as stored", async (t)
 
 // Commands panel (architecture 6.6.4, design spec 15)
 
-const SHIELD_DEFAULT =
-  '/give @p shield[custom_name=[{text:"###",obfuscated:true,color:"gold",italic:false},{text:" input the name you want ",obfuscated:false,color:"yellow"},{text:"###",obfuscated:true,color:"gold"}],enchantments={unbreaking:3,mending:1,vanishing_curse:1}] 1';
+const SHIELD_DEFAULT = '/give @s shield[custom_name={text:"input the name you want",obfuscated:false},enchantments={unbreaking:3,mending:1,vanishing_curse:1}] 1';
+const NAME_DESCRIBED_BY = "pc-cmd-name-hint pc-cmd-name-obfuscated";
 const byClass = (name) => (el) => el.classList.contains(name);
 const byId = (id) => (el) => el.getAttribute("id") === id;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -341,7 +341,6 @@ function commandsFixture(t, { settings = { ...DEFAULT_SETTINGS }, ui, commands =
   const el = panel.el;
   const codes = () => el.findAll((n) => n.tagName === "CODE" && n.classList.contains("pc-cmd__code"));
   const input = el.find(byId("pc-cmd-name"));
-  const selects = el.findAll((n) => n.tagName === "SELECT");
   const radios = el.findAll((n) => n.tagName === "INPUT" && n.getAttribute("type") === "radio");
   const notice = el.find(byId("pc-cmd-name-removed"));
   const reset = el.find(byId("pc-cmd-reset"));
@@ -350,35 +349,30 @@ function commandsFixture(t, { settings = { ...DEFAULT_SETTINGS }, ui, commands =
     input.value = value;
     input.dispatch("input", { inputType: "insertText", ...init });
   };
-  const choose = (select, value) => {
-    select.value = value;
-    select.dispatch("change");
-  };
   const setMode = (id) => {
     for (const radio of radios) radio.checked = radio.getAttribute("value") === id;
     radios.find((r) => r.getAttribute("value") === id).dispatch("change");
   };
-  return { panel, el, codes, input, selects, radios, notice, reset, copies, type, choose, setMode, reported, live };
+  return { panel, el, codes, input, radios, notice, reset, copies, type, setMode, reported, live };
 }
 
 test("commands panel: 16 item cards, 22 commands with the default settings, names in the current language", (t) => {
-  const { el, codes, selects, radios } = commandsFixture(t);
+  const { el, codes, radios, input } = commandsFixture(t);
   assert.equal(el.findAll((n) => n.tagName === "H3" && n.classList.contains("pc-cmd-card__title")).length, 16);
   assert.equal(codes().length, 22);
   codes().forEach((code, i) => assert.equal(code.textContent, buildCommand(COMMANDS[i], DEFAULT_SETTINGS), COMMANDS[i].id));
   assert.equal(codes()[15].textContent, SHIELD_DEFAULT);
+  assert.ok(codes()[1].textContent.endsWith("vanishing_curse:1}]"), "the bow command has no count");
   assert.equal(el.find(byId("pc-cmd-group-diamond_pickaxe_fortune")).textContent, "Diamond Pickaxe");
   assert.equal(el.find(byId("pc-cmd-row-diamond_pickaxe_silk_touch-variant")).textContent, "Silk Touch");
   assert.equal(el.find(byId("pc-cmd-row-shield-variant")), null, "no variant chip for a single command");
   assert.equal(radios.length, 2);
-  assert.deepEqual(radios.map((r) => [r.getAttribute("name"), r.getAttribute("value"), r.checked]), [["pc-cmd-mode", "block", true], ["pc-cmd-mode", "chat", false]]);
-  assert.equal(selects.length, 3);
-  assert.deepEqual(selects[0].children.map((o) => o.getAttribute("value")), [...SYMBOLS]);
-  for (const select of selects.slice(1)) {
-    assert.deepEqual(select.children.map((o) => o.getAttribute("value")), [...COLORS]);
-    assert.equal(select.children[6].textContent, en["commands.colors.gold"]);
-  }
-  assert.deepEqual(selects.map((s) => s.value), ["###", "gold", "yellow"]);
+  assert.deepEqual(radios.map((r) => [r.getAttribute("name"), r.getAttribute("value"), r.checked]), [["pc-cmd-mode", "block", false], ["pc-cmd-mode", "chat", true]]);
+  assert.equal(el.findAll((n) => n.tagName === "SELECT").length, 0, "no symbol or colour settings");
+  assert.equal(el.find(byClass("pc-cmd-preview")), null, "no preview");
+  const hint = el.find(byId("pc-cmd-name-obfuscated"));
+  assert.equal(hint.textContent, en["commands.name.obfuscated"]);
+  assert.equal(input.getAttribute("aria-describedby"), NAME_DESCRIBED_BY);
   assert.equal(el.findAll((n) => n.tagName === "FORM").length, 0, "no form: Enter cannot submit or reload");
   assert.equal(el.find(byId("pc-commands-heading")).getAttribute("tabindex"), "-1");
   for (const label of el.findAll((n) => n.tagName === "LABEL")) assert.ok(el.find(byId(label.getAttribute("for"))), label.textContent);
@@ -391,7 +385,7 @@ test("commands panel: unsupported characters are removed, written back and annou
   assert.equal(input.value, "Excalibur ");
   assert.equal(notice.hidden, false);
   assert.equal(notice.textContent, en["commands.name.removed"]);
-  assert.equal(input.getAttribute("aria-describedby"), "pc-cmd-name-removed pc-cmd-name-hint");
+  assert.equal(input.getAttribute("aria-describedby"), `pc-cmd-name-removed ${NAME_DESCRIBED_BY}`);
   await wait(80);
   assert.equal(live.textContent, en["commands.name.removed"]);
   live.textContent = "";
@@ -400,13 +394,13 @@ test("commands panel: unsupported characters are removed, written back and annou
   assert.equal(live.textContent, "", "already shown: no second announcement");
   assert.deepEqual(codes(), before, "cards are not rebuilt");
   assert.equal(el.find(byId("pc-cmd-name")), input, "the input is not rebuilt");
-  assert.ok(codes().every((code) => code.textContent.includes('{text:" Excalibur ",obfuscated:false')));
+  assert.ok(codes().every((code) => code.textContent.includes('custom_name={text:"Excalibur",obfuscated:false}')));
   assert.equal(reported.at(-1).name, "Excalibur ");
 
   type("Excalibur S");
   assert.equal(notice.hidden, true, "a change without removed characters hides the notice");
-  assert.equal(input.getAttribute("aria-describedby"), "pc-cmd-name-hint");
-  assert.ok(codes()[0].textContent.includes(" Excalibur S "));
+  assert.equal(input.getAttribute("aria-describedby"), NAME_DESCRIBED_BY);
+  assert.ok(codes()[0].textContent.includes('{text:"Excalibur S",'));
 });
 
 test("commands panel: nothing is processed while an IME composes; compositionend processes once", (t) => {
@@ -419,15 +413,15 @@ test("commands panel: nothing is processed while an IME composes; compositionend
   input.dispatch("compositionend");
   assert.equal(input.value, "劍");
   assert.equal(notice.hidden, false);
-  assert.ok(codes()[15].textContent.includes('{text:" 劍 ",'));
+  assert.ok(codes()[15].textContent.includes('{text:"劍",'));
 });
 
 test("commands panel: names are text only; typing past 50 is refused, a paste keeps the first 50", (t) => {
   const { codes, input, type, el } = commandsFixture(t);
   type("<img src=x onerror=alert(1)>");
   assert.equal(el.findAll((n) => n.tagName === "IMG").length, 0);
-  assert.ok(codes()[15].textContent.includes('{text:" <img src=x onerror=alert(1)> ",'));
-  assert.equal(el.find(byClass("pc-cmd__name")).textContent, "<img src=x onerror=alert(1)>");
+  assert.ok(codes()[15].textContent.includes('{text:"<img src=x onerror=alert(1)>",'));
+  assert.equal(codes()[15].findAll((n) => n.tagName === "SPAN").length, 0, "the command is plain text with line break hints");
 
   type("a".repeat(50));
   type(`${"a".repeat(50)}b`);
@@ -438,57 +432,50 @@ test("commands panel: names are text only; typing past 50 is refused, a paste ke
   assert.equal(el.find(byClass("pc-cmd-name__count")).textContent, "50 / 50");
 });
 
-test("commands panel: chat mode switches to @s, marks the 21 long commands and hides the command block guide", (t) => {
+test("commands panel: chat by default marks the 3 long commands; command block mode switches to @p and shows the guide", (t) => {
   const { el, codes, setMode, copies } = commandsFixture(t);
   const guide = el.find(byClass("pc-cmd-block"));
-  assert.equal(guide.hidden, false);
-  assert.ok(el.findAll(byClass("pc-cmd-row__len")).every((n) => n.hidden), "block mode shows no length");
-  setMode("chat");
   assert.equal(guide.hidden, true);
   assert.ok(codes().every((code) => code.textContent.startsWith("/give @s ")));
-  codes().forEach((code, i) => assert.equal(code.textContent, buildCommand(COMMANDS[i], { ...DEFAULT_SETTINGS, mode: "chat" })));
   const warns = el.findAll(byClass("pc-cmd-row__warn"));
-  assert.equal(warns.length, 21);
-  assert.ok(!warns.some((n) => n.getAttribute("id") === "pc-cmd-row-shield-len"));
-  assert.equal(el.find(byId("pc-cmd-row-shield-len")).textContent, "252 / 256 characters");
-  assert.match(el.find(byId("pc-cmd-row-diamond_sword-len")).textContent, /^Too long for chat \(352 \/ 256 characters\)/);
+  assert.deepEqual(warns.map((n) => n.getAttribute("id")), ["pc-cmd-row-diamond_helmet-len", "pc-cmd-row-diamond_boots_depth_strider-len", "pc-cmd-row-diamond_boots_frost_walker-len"]);
+  assert.equal(el.find(byId("pc-cmd-row-shield-len")).textContent, "136 / 256 characters");
+  assert.match(el.find(byId("pc-cmd-row-diamond_helmet-len")).textContent, /^Too long for chat \(257 \/ 256 characters\)/);
+  assert.match(el.find(byId("pc-cmd-row-diamond_boots_depth_strider-len")).textContent, /^Too long for chat \(273 \/ 256 characters\)/);
+  assert.match(el.find(byId("pc-cmd-row-diamond_boots_frost_walker-len")).textContent, /^Too long for chat \(272 \/ 256 characters\)/);
   assert.equal(copies()[0].getAttribute("aria-describedby"), "pc-cmd-group-diamond_sword pc-cmd-row-diamond_sword-len");
   assert.equal(copies()[4].getAttribute("aria-describedby"), "pc-cmd-group-trident_channeling pc-cmd-row-trident_riptide-variant pc-cmd-row-trident_riptide-len");
+
   setMode("block");
+  assert.equal(guide.hidden, false);
+  assert.ok(el.findAll(byClass("pc-cmd-row__len")).every((n) => n.hidden), "block mode shows no length");
+  codes().forEach((code, i) => assert.equal(code.textContent, buildCommand(COMMANDS[i], { ...DEFAULT_SETTINGS, mode: "block" })));
+  assert.ok(codes().every((code) => code.textContent.startsWith("/give @p ")));
   assert.equal(copies()[4].getAttribute("aria-describedby"), "pc-cmd-group-trident_channeling pc-cmd-row-trident_riptide-variant");
 });
 
-test("commands panel: control values outside the whitelists fall back to the defaults", (t) => {
-  const { codes, selects, choose, radios } = commandsFixture(t);
-  choose(selects[0], "<b>");
-  choose(selects[1], "#ffffff");
-  choose(selects[2], 'gold"');
-  radios[1].setAttribute("value", "@a");
-  radios[1].checked = true;
-  radios[0].checked = false;
-  radios[1].dispatch("change");
+test("commands panel: a mode value outside the whitelist falls back to chat", (t) => {
+  const { codes, radios } = commandsFixture(t, { settings: { mode: "block", name: "" } });
+  radios[0].setAttribute("value", "@a");
+  radios[0].checked = true;
+  radios[1].checked = false;
+  radios[0].dispatch("change");
   assert.equal(codes()[15].textContent, SHIELD_DEFAULT);
-  assert.deepEqual(selects.map((s) => s.value), ["###", "gold", "yellow"]);
+  assert.equal(radios[1].checked, true);
 });
 
-test("commands panel: reset restores the five defaults, keeps focus on the button and announces once", async (t) => {
-  const { codes, selects, choose, setMode, type, reset, input, notice, radios, live, reported } = commandsFixture(t);
-  setMode("chat");
+test("commands panel: reset restores the two defaults, keeps focus on the button and announces once", async (t) => {
+  const { codes, setMode, type, reset, input, notice, radios, live, reported } = commandsFixture(t);
+  setMode("block");
   type("Excalibur ★");
-  choose(selects[0], "***");
-  choose(selects[1], "red");
-  choose(selects[2], "aqua");
-  assert.equal(
-    codes()[15].textContent,
-    '/give @s shield[custom_name=[{text:"***",obfuscated:true,color:"red",italic:false},{text:" Excalibur ",obfuscated:false,color:"aqua"},{text:"***",obfuscated:true,color:"red"}],enchantments={unbreaking:3,mending:1,vanishing_curse:1}] 1',
-  );
+  assert.equal(codes()[15].textContent, '/give @p shield[custom_name={text:"Excalibur",obfuscated:false},enchantments={unbreaking:3,mending:1,vanishing_curse:1}] 1');
   reset.focus();
   await reset.click();
   assert.equal(codes()[15].textContent, SHIELD_DEFAULT);
-  assert.deepEqual([radios[0].checked, input.value, ...selects.map((s) => s.value)], [true, "", "###", "gold", "yellow"]);
+  assert.deepEqual([radios[0].checked, radios[1].checked, input.value], [false, true, ""]);
   assert.equal(notice.hidden, true);
   assert.equal(document.activeElement, reset);
-  assert.deepEqual(reported.at(-1), { mode: "block", name: "", symbols: "###", symbolColor: "gold", nameColor: "yellow" });
+  assert.deepEqual(reported.at(-1), { mode: "chat", name: "" });
   await wait(80);
   assert.equal(live.textContent, en["commands.reset.live"]);
 });
@@ -498,10 +485,11 @@ test("commands panel: copy buttons copy the current command; failure shows the s
   const shieldCopy = copies()[15];
   assert.equal(shieldCopy.textContent, en["commands.copy"]);
   assert.equal(shieldCopy.getAttribute("aria-label"), null, "the visible text is the name");
-  assert.equal(shieldCopy.getAttribute("aria-describedby"), "pc-cmd-group-shield");
+  assert.equal(shieldCopy.getAttribute("aria-describedby"), "pc-cmd-group-shield pc-cmd-row-shield-len");
   const written = [];
   await withNavigator({ clipboard: { writeText: async (text) => written.push(text) } }, () => shieldCopy.click());
   assert.deepEqual(written, [SHIELD_DEFAULT]);
+  assert.ok(written[0].includes("obfuscated:false"), "the copied command keeps obfuscated:false");
 
   await withNavigator({}, () => shieldCopy.click());
   const fallback = el.find(byId("pc-cmd-row-shield")).find(byClass("pc-copy-fallback-host"));
@@ -511,19 +499,14 @@ test("commands panel: copy buttons copy the current command; failure shows the s
   assert.equal(fallback.hidden, true, "a settings change closes the stale fallback field");
 });
 
-test("commands panel: the notice and the guide state survive a rebuild; dark colours add the preview note", (t) => {
+test("commands panel: the notice, the guide state, the mode and the typed name survive a rebuild", (t) => {
   const ui = { blockOpen: false, notice: true };
-  const { el, notice, choose, selects } = commandsFixture(t, { settings: { mode: "chat", name: "Ex ", symbols: "X", symbolColor: "red", nameColor: "aqua" }, ui });
+  const { el, notice, input, codes } = commandsFixture(t, { settings: { mode: "block", name: "Ex " }, ui });
   assert.equal(notice.hidden, false);
+  assert.equal(input.getAttribute("aria-describedby"), `pc-cmd-name-removed ${NAME_DESCRIBED_BY}`);
   assert.equal(el.find(byClass("pc-cmd-block")).open, false);
-  assert.equal(el.find(byId("pc-cmd-name")).value, "Ex ");
-  const segs = el.findAll(byClass("pc-cmd-preview__seg"));
-  assert.deepEqual(segs.map((s) => s.textContent), ["X", " Ex ", "X"]);
-  const darkNote = el.find(byClass("pc-cmd-preview")).children.at(-1);
-  assert.equal(darkNote.hidden, true);
-  choose(selects[2], "dark_blue");
-  assert.equal(darkNote.hidden, false);
-  assert.ok(segs[1].classList.contains("is-on-light") && segs[1].classList.contains("pc-mc--dark_blue"));
+  assert.equal(input.value, "Ex ");
+  assert.ok(codes()[15].textContent.startsWith('/give @p shield[custom_name={text:"Ex",'));
 });
 
 test("commands panel: invalid entries are skipped; no valid entry shows the empty text; the tab has no badge", (t) => {
@@ -540,17 +523,18 @@ test("commands panel: invalid entries are skipped; no valid entry shows the empt
   assert.ok(button.find(byClass("pc-tab__name--short")), "short label for the stacked layout");
 });
 
-test("commands panel: item, variant and colour names follow the current language", async (t) => {
+test("commands panel: item names, variant names and the obfuscated hint follow the current language", async (t) => {
   const savedFetch = globalThis.fetch;
-  globalThis.fetch = createFakeFetch({ "i18n/zh-TW.json": await readDict("zh-TW") }).fetch;
+  const zh = await readDict("zh-TW");
+  globalThis.fetch = createFakeFetch({ "i18n/zh-TW.json": zh }).fetch;
   try {
     await setLang("zh-TW");
   } finally {
     globalThis.fetch = savedFetch;
   }
   t.after(() => setLang("en"));
-  const { el, selects } = commandsFixture(t);
+  const { el } = commandsFixture(t);
   assert.equal(el.find(byId("pc-cmd-group-diamond_pickaxe_fortune")).textContent, "鑽石鎬");
   assert.equal(el.find(byId("pc-cmd-row-diamond_pickaxe_silk_touch-variant")).textContent, "精準採集");
-  assert.equal(selects[1].children[6].textContent, "金色");
+  assert.equal(el.find(byId("pc-cmd-name-obfuscated")).textContent, zh.messages["commands.name.obfuscated"]);
 });

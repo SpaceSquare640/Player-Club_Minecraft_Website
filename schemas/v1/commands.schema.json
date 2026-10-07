@@ -15,7 +15,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "label", "item", "enchantments", "count"],
+        "required": ["id", "label", "item", "enchantments"],
         "properties": {
           "id": { "$ref": "urn:player-club:v1:defs#/$defs/snakeId" },
           "label": { "$ref": "urn:player-club:v1:defs#/$defs/localizedText30" },
@@ -32,7 +32,12 @@
             "maxLength": 1000,
             "pattern": "^\\{[a-z][a-z0-9_]{0,63}:[1-9][0-9]{0,2}(?:,[a-z][a-z0-9_]{0,63}:[1-9][0-9]{0,2})*\\}$"
           },
-          "count": { "type": "integer", "minimum": 1, "maximum": 64 }
+          "count": {
+            "description": "Item count written after the components. Omit it to end the command at ] (the game gives one item).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          }
         }
       }
     }

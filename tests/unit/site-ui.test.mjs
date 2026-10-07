@@ -67,13 +67,7 @@ test("index.html: the tab panel holds the points view and the hidden Commands ho
   assert.equal(points.trimEnd().endsWith("</div>\n                </div>".trimEnd()), true, "the points view closes before the commands host");
 });
 
-test("CSS: the 16 Minecraft colours have a token and a class; swatches and preview use no style attributes", () => {
-  const colors = ["black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white"];
-  for (const id of colors) {
-    const token = `--pc-mc-${id.replaceAll("_", "-")}`;
-    assert.match(css["css/tokens.css"], new RegExp(`${token}: #[0-9a-f]{6};`), token);
-    assert.ok(css["css/components.css"].includes(`.pc-mc--${id} { --pc-mc: var(${token}); }`), id);
-  }
+test("JS sets no style attributes", () => {
   for (const { file, source } of jsSources) assert.doesNotMatch(source, /\.style\b|setAttribute\(\s*"style"/, file);
 });
 

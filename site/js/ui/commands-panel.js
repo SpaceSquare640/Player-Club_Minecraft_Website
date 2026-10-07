@@ -1,22 +1,19 @@
-// Commands tab of worlds with commands: true (design spec 15): settings (usage mode, item name, symbols,
-// two colours, reset), a preview and one card per item with its /give commands and copy buttons.
+// Commands tab of worlds with commands: true (design spec 15): settings (usage mode, item name, reset)
+// and one card per item with its /give commands and copy buttons.
 // The settings live in app memory only (never in the hash or browser storage). Controls are created
-// once; a settings change rewrites the command texts, lengths and preview in place (no rebuild, no
+// once; a settings change rewrites the command texts and lengths in place (no rebuild, no
 // announcement of command text). Every text is set through h() / textContent; no HTML is parsed.
 
 import { getLang, pick, t } from "../i18n.js";
 import {
   CHAT_COMMAND_LIMIT,
-  COLORS,
   DEFAULT_SETTINGS,
   MAX_NAME_LENGTH,
   MODES,
   NAME_PLACEHOLDER,
-  SYMBOLS,
   buildCommand,
   cleanNameInput,
   commandLength,
-  commandParts,
   exceedsChatLimit,
   filterNameChars,
   groupCommands,
@@ -30,10 +27,10 @@ import { h, icon, replaceChildren } from "./dom.js";
 import { announce } from "./live.js";
 
 export const COMMANDS_HEADING_ID = "pc-commands-heading";
-/** Game colours that are hard to read on the dark preview box; their segments get a light backing. */
-export const DARK_COLORS = Object.freeze(["black", "dark_blue", "dark_red", "dark_purple", "dark_gray"]);
 const GIVE_COMMAND_BLOCK = "/give @s command_block";
 const SERVER_SETTING = "enable-command-block=true";
+/** The name input is described by the rules hint and the obfuscated hint (plus the notice when shown). */
+const NAME_DESCRIBED_BY = "pc-cmd-name-hint pc-cmd-name-obfuscated";
 const PASTE_INPUT_TYPES = new Set(["insertFromPaste", "insertFromDrop", "insertReplacementText"]);
 
 /** Splits a dictionary template at {name} and puts a code element there (no HTML parsing). */
@@ -62,8 +59,7 @@ function localized(value) {
 /**
  * @param {{ commands: object[], settings: object, onSettingsChange: (raw: object) => void, scope: object,
  *   ui?: { blockOpen: boolean, notice: boolean } }} options
- *   settings: raw values { mode, name, symbols, symbolColor, nameColor } (app memory); they are checked
- *   against the whitelists before use. ui: app-owned state of the command block instructions (open or
+ *   settings: raw values { mode, name } (app memory); they are checked before use. ui: app-owned state of the command block instructions (open or
  *   closed) and the removed-characters notice, kept when the panel is rebuilt for another language.
  * @returns {{ el: HTMLElement, focusTitle: () => void }}
  */
@@ -143,7 +139,7 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
       spellcheck: "false",
       enterkeyhint: "done",
       placeholder: NAME_PLACEHOLDER,
-      "aria-describedby": "pc-cmd-name-hint",
+      "aria-describedby": NAME_DESCRIBED_BY,
     },
   });
   nameInput.value = String(settings?.name ?? "");
@@ -159,6 +155,8 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
     attrs: { id: "pc-cmd-name-hint" },
     text: t("commands.name.hint", { max: MAX_NAME_LENGTH, placeholder: NAME_PLACEHOLDER }),
   });
+  // Every command has obfuscated:false; the hint tells players how to scramble the name themselves.
+  const obfuscatedHint = h("p", { className: "pc-field__hint", attrs: { id: "pc-cmd-name-obfuscated" }, text: t("commands.name.obfuscated") });
   const nameField = h(
     "div",
     { className: "pc-field pc-field--name" },
@@ -166,41 +164,10 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
     h("div", { className: "pc-cmd-name" }, nameInput, clearName),
     notice,
     hint,
+    obfuscatedHint,
   );
 
-  // ---------------------------------------------------------------- Symbols and colours
-  function selectField(id, labelKey, values, optionText, value, swatch) {
-    const select = h(
-      "select",
-      { className: `pc-select${swatch ? " pc-select--swatch" : " pc-select--mono"}`, attrs: { id }, on: { change: () => update() } },
-      values.map((v) => h("option", { attrs: { value: v, selected: v === value }, text: optionText(v) })),
-    );
-    select.value = value;
-    const chip = swatch ? h("span", { className: `pc-swatch pc-mc--${value}`, attrs: { "aria-hidden": "true" } }) : null;
-    const field = h(
-      "div",
-      { className: "pc-field" },
-      h("div", { className: "pc-field__head" }, h("label", { className: "pc-field__label", attrs: { for: id }, text: t(labelKey) })),
-      swatch ? h("div", { className: "pc-swatch-select" }, chip, select) : select,
-    );
-    return { field, select, chip };
-  }
-  const colorName = (id) => t(`commands.colors.${id}`);
-  const symbols = selectField("pc-cmd-symbols", "commands.symbols.label", SYMBOLS, (v) => v, start.symbols, false);
-  const symbolColor = selectField("pc-cmd-symbol-color", "commands.symbolColor.label", COLORS, colorName, start.symbolColor, true);
-  const nameColor = selectField("pc-cmd-name-color", "commands.nameColor.label", COLORS, colorName, start.nameColor, true);
-
-  // ---------------------------------------------------------------- Preview and reset
-  const previewSegs = [0, 1, 2].map(() => h("span", { className: "pc-cmd-preview__seg" }));
-  const darkNote = h("p", { className: "pc-field__hint", text: t("commands.preview.darkNote"), hidden: true });
-  const preview = h(
-    "div",
-    { className: "pc-cmd-preview" },
-    h("p", { className: "pc-cmd-preview__label", text: t("commands.preview.label") }),
-    h("div", { className: "pc-cmd-preview__box", attrs: { lang: "en", translate: "no" } }, previewSegs),
-    h("p", { className: "pc-field__hint", text: t("commands.preview.note") }),
-    darkNote,
-  );
+  // ---------------------------------------------------------------- Reset
   const reset = h("button", {
     className: "pc-btn pc-btn--text pc-cmd-reset",
     attrs: { type: "button", id: "pc-cmd-reset" },
@@ -214,8 +181,7 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
     h("h3", { className: "pc-cmd-settings__title", attrs: { id: "pc-cmd-settings-title" }, text: t("commands.settings.title") }),
     h("p", { className: "pc-cmd-settings__version", text: t("commands.version") }),
     modeField,
-    h("div", { className: "pc-cmd-fields" }, nameField, symbols.field, symbolColor.field, nameColor.field),
-    preview,
+    h("div", { className: "pc-cmd-fields" }, nameField),
     reset,
   );
 
@@ -266,30 +232,18 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
 
   // ---------------------------------------------------------------- Behaviour
 
-  /** Raw values of the five controls (validated by normalizeSettings before any use). */
+  /** Raw values of the two controls (validated by normalizeSettings before any use). */
   function raw() {
-    return {
-      mode: radios.find((r) => r.checked)?.getAttribute("value") ?? DEFAULT_SETTINGS.mode,
-      name: nameInput.value,
-      symbols: symbols.select.value,
-      symbolColor: symbolColor.select.value,
-      nameColor: nameColor.select.value,
-    };
+    return { mode: radios.find((r) => r.checked)?.getAttribute("value") ?? DEFAULT_SETTINGS.mode, name: nameInput.value };
   }
   const current = () => normalizeSettings(raw());
 
   function renderCode(row, s) {
-    const parts = commandParts(row.entry, s);
-    replaceChildren(
-      row.code,
-      breakAtCommas(parts.before),
-      h("span", { className: `pc-cmd__name${parts.placeholder ? " is-placeholder" : ""}`, text: parts.name }),
-      breakAtCommas(parts.after),
-    );
+    const command = buildCommand(row.entry, s);
+    replaceChildren(row.code, breakAtCommas(command));
     const chat = s.mode === "chat";
     row.length.hidden = !chat;
     if (chat) {
-      const command = parts.before + parts.name + parts.after;
       const n = commandLength(command);
       const over = exceedsChatLimit(command);
       row.length.className = over ? "pc-cmd-row__len pc-cmd-row__warn" : "pc-cmd-row__len";
@@ -309,25 +263,11 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
     }
   }
 
-  function renderPreview(s) {
-    const name = s.name === "" ? NAME_PLACEHOLDER : s.name;
-    const segs = [
-      [s.symbols, s.symbolColor],
-      [` ${name} `, s.nameColor],
-      [s.symbols, s.symbolColor],
-    ];
-    segs.forEach(([text, color], i) => {
-      previewSegs[i].textContent = text;
-      previewSegs[i].className = `pc-cmd-preview__seg pc-mc--${color}${DARK_COLORS.includes(color) ? " is-on-light" : ""}`;
-    });
-    darkNote.hidden = !DARK_COLORS.includes(s.symbolColor) && !DARK_COLORS.includes(s.nameColor);
-  }
-
   function setNotice(show) {
     const wasHidden = notice.hidden;
     notice.hidden = !show;
     notice.textContent = show ? t("commands.name.removed") : "";
-    nameInput.setAttribute("aria-describedby", show ? "pc-cmd-name-removed pc-cmd-name-hint" : "pc-cmd-name-hint");
+    nameInput.setAttribute("aria-describedby", show ? `pc-cmd-name-removed ${NAME_DESCRIBED_BY}` : NAME_DESCRIBED_BY);
     ui.notice = show;
     if (show && wasHidden) announce(t("commands.name.removed"));
   }
@@ -337,16 +277,9 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
     for (const radio of radios) radio.checked = radio.getAttribute("value") === s.mode;
     blockGuide.hidden = s.mode !== "block";
     chatNote.hidden = s.mode !== "chat";
-    // Values outside the whitelists (edited in developer tools) are shown as the defaults that are used.
-    if (symbols.select.value !== s.symbols) symbols.select.value = s.symbols;
-    if (symbolColor.select.value !== s.symbolColor) symbolColor.select.value = s.symbolColor;
-    if (nameColor.select.value !== s.nameColor) nameColor.select.value = s.nameColor;
-    symbolColor.chip.className = `pc-swatch pc-mc--${s.symbolColor}`;
-    nameColor.chip.className = `pc-swatch pc-mc--${s.nameColor}`;
     count.textContent = t("commands.name.count", { n: codePointLength(sanitizeName(nameInput.value).name), max: MAX_NAME_LENGTH });
     clearName.hidden = nameInput.value === "";
     for (const row of rows) renderCode(row, s);
-    renderPreview(s);
     onSettingsChange?.(raw());
   }
 
@@ -402,9 +335,6 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
     for (const radio of radios) radio.checked = radio.getAttribute("value") === DEFAULT_SETTINGS.mode;
     nameInput.value = "";
     accepted = "";
-    symbols.select.value = DEFAULT_SETTINGS.symbols;
-    symbolColor.select.value = DEFAULT_SETTINGS.symbolColor;
-    nameColor.select.value = DEFAULT_SETTINGS.nameColor;
     setNotice(false);
     update();
     reset.focus();
@@ -415,7 +345,7 @@ export function createCommandsPanel({ commands, settings, onSettingsChange, scop
   notice.hidden = !ui.notice;
   if (ui.notice) {
     notice.textContent = t("commands.name.removed");
-    nameInput.setAttribute("aria-describedby", "pc-cmd-name-removed pc-cmd-name-hint");
+    nameInput.setAttribute("aria-describedby", `pc-cmd-name-removed ${NAME_DESCRIBED_BY}`);
   }
   update();
 

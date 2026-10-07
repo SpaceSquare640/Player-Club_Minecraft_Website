@@ -19,8 +19,7 @@
         "zh-TW": "弓"
       },
       "item": "bow",
-      "enchantments": "{unbreaking:3,power:5,punch:2,flame:1,infinity:1,mending:1,vanishing_curse:1}",
-      "count": 1
+      "enchantments": "{unbreaking:3,power:5,punch:2,flame:1,infinity:1,mending:1,vanishing_curse:1}"
     },
     {
       "id": "crossbow",

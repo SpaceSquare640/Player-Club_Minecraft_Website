@@ -4,7 +4,7 @@
 // Render pipelines are separate: the world info panel depends on world + language only, the pinned
 // spawn card on world + dimension + language, and only the list follows search and tags.
 // Worlds with commands: true get a Commands tab after the dimension tabs (view=commands); its data
-// loads on first use and its five settings live only in app memory (never in the hash or storage).
+// loads on first use and its two settings live only in app memory (never in the hash or storage).
 
 import { createRepository } from "./data/repository.js";
 import { getLang, initI18n, setLang, t, textLang } from "./i18n.js";
@@ -65,7 +65,7 @@ const app = {
   core: null,
   points: {},
   commands: {},
-  // Commands tab: raw values of the five settings and the panel's own display state, kept for this visit only.
+  // Commands tab: raw values of the two settings and the panel's own display state, kept for this visit only.
   commandSettings: { ...DEFAULT_SETTINGS },
   commandsUi: { blockOpen: true, notice: false },
   commandsPanel: null,
