@@ -1,6 +1,7 @@
 // Tabs (WAI-ARIA tabs, automatic activation, roving tabindex), used for the dimensions and the
 // change log sections. Left / Right / Home / End move and activate. On narrow screens the strip scrolls
-// sideways: its edges fade where tabs are hidden, and a newly selected tab is scrolled into view.
+// sideways: its edges fade where tabs are hidden, and the selected tab is scrolled into view when it is
+// new or when new labels or counts move it.
 // Visual design adapted from Uiverse.io by chase2k25 (rare-quail-40), MIT License; see css/components.css.
 
 import { h, prefersReducedMotion, replaceChildren, watchHorizontalOverflow } from "./dom.js";
@@ -18,6 +19,7 @@ export function createTabs({ className = "", idPrefix, panelId, onSelect }) {
   const el = h("div", { className: `pc-tabs${className ? ` ${className}` : ""}`, attrs: { role: "tablist" } });
   let buttons = new Map();
   let signature = "";
+  let text = ""; // labels, short labels and counts of the last render
   let revealedId = null;
 
   el.addEventListener("keydown", (event) => {
@@ -89,12 +91,20 @@ export function createTabs({ className = "", idPrefix, panelId, onSelect }) {
     }
     // Labels and counts change the content width (language, filters), not the strip size.
     refreshOverflow();
-    // Click, keyboard, hash and back / forward all end here. Only a newly selected tab is revealed, so a
-    // strip the user scrolled by hand stays put when the same tab is re-rendered.
+    // Click, keyboard, hash and back / forward all end here. A newly selected tab is revealed: smoothly,
+    // except on the first render (page load or a link to a tab), which jumps. The same tab is revealed
+    // again, at once, only when the tab text changed (language, filter counts): that moves the tabs
+    // without resizing the strip, so the ResizeObserver stays silent. A plain re-render leaves a strip
+    // the user scrolled by hand where it is.
+    const nextText = JSON.stringify(tabs.map((tab) => [tab.label, tab.shortLabel ?? null, tab.count ?? null]));
     if (selectedId !== revealedId) {
+      const first = revealedId === null;
       revealedId = selectedId;
-      reveal(true);
+      reveal(!first);
+    } else if (nextText !== text) {
+      reveal(false);
     }
+    text = nextText;
   }
 
   return {

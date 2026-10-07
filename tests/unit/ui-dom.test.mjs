@@ -624,10 +624,11 @@ function stubGlobal(t, name, value) {
 
 /**
  * Tabs with a fake layout: a 296 px strip holding four tabs 326 px wide in total (Builder World at 320 px),
- * or the given tab widths. ResizeObserver callbacks are collected so the test can fire them; scrollTo moves
+ * or the given tab widths. With layoutOnBuild new tab buttons get their layout as soon as they are added (as in a
+ * browser), otherwise only through layout() / select(). ResizeObserver callbacks are collected so the test can fire them; scrollTo moves
  * scrollLeft at once.
  */
-function tabsFixture(t, { widths = [96, 80, 60, 90] } = {}) {
+function tabsFixture(t, { widths = [96, 80, 60, 90], layoutOnBuild = false } = {}) {
   const observers = [];
   stubGlobal(t, "ResizeObserver", class {
     constructor(fn) {
@@ -638,7 +639,8 @@ function tabsFixture(t, { widths = [96, 80, 60, 90] } = {}) {
     }
   });
   let tabs;
-  const render = (id) => tabs.update(WORLD_TABS, id, "Dimensions");
+  let current = WORLD_TABS;
+  const render = (id) => tabs.update(current, id, "Dimensions");
   tabs = createTabs({ idPrefix: "pc-dim-tab", panelId: "pc-tabpanel", onSelect: render });
   const strip = tabs.el;
   const scrolls = [];
@@ -658,6 +660,13 @@ function tabsFixture(t, { widths = [96, 80, 60, 90] } = {}) {
       x += widths[i];
     });
   };
+  if (layoutOnBuild) {
+    const append = strip.append.bind(strip);
+    strip.append = (...nodes) => {
+      append(...nodes);
+      layout();
+    };
+  }
   mount(t, strip);
   const resize = () => observers.filter((o) => o.target === strip).forEach((o) => o.fn([]));
   const button = (id) => strip.find(byId(`pc-dim-tab-${id}`));
@@ -665,7 +674,13 @@ function tabsFixture(t, { widths = [96, 80, 60, 90] } = {}) {
     layout();
     render(id);
   };
-  return { tabs, strip, scrolls, pageScrolls, select, resize, button, layout, render };
+  /** New labels or counts (language, filters): new tab widths, same strip size. */
+  const relabel = (list, nextWidths) => {
+    current = list;
+    widths.splice(0, widths.length, ...nextWidths);
+    strip.scrollWidth = widths.reduce((sum, w) => sum + w, 0);
+  };
+  return { tabs, strip, scrolls, pageScrolls, select, resize, button, layout, render, relabel };
 }
 
 const stateOf = (strip) => ["is-scrollable", "has-overflow-start", "has-overflow-end"].filter((name) => strip.classList.contains(name));
@@ -758,6 +773,46 @@ test("tab strip: a revealed tab stops exactly one edge fade (16 px) clear of the
   strip.scrollLeft = 300;
   select("the_nether"); // shown at -180 to 20: almost all hidden on the left
   assert.deepEqual(scrolls.at(-1), { left: 104, behavior: "smooth" });
+});
+
+test("tab strip: the first render (page load or a link to a tab) jumps to the selected tab; later selections glide", (t) => {
+  stubGlobal(t, "matchMedia", (query) => ({ media: query, matches: false }));
+  const { scrolls, select } = tabsFixture(t, { layoutOnBuild: true });
+  select("commands"); // #...&view=commands at 320 px: Commands is partly hidden on the right
+  assert.deepEqual(scrolls, [{ left: 30, behavior: "auto" }], "no animation on load");
+  select("overworld");
+  assert.deepEqual(scrolls.at(-1), { left: 0, behavior: "smooth" });
+});
+
+test("tab strip: new labels or counts with the same tab selected reveal it again at once; a plain re-render leaves a hand-scrolled strip alone", (t) => {
+  stubGlobal(t, "matchMedia", (query) => ({ media: query, matches: false }));
+  const { strip, scrolls, select, relabel } = tabsFixture(t);
+  select("overworld");
+  select("commands");
+  assert.deepEqual(scrolls, [{ left: 30, behavior: "smooth" }]);
+
+  // English to 繁體中文: the labels change width but the strip keeps its size, so no ResizeObserver call.
+  const names = { overworld: "主世界", the_nether: "地獄", the_end: "終界", commands: "指令產生器" };
+  const zhTabs = WORLD_TABS.map((tab) => ({ ...tab, label: names[tab.id], shortLabel: names[tab.id] }));
+  relabel(zhTabs, [96, 80, 60, 120]); // Commands is now 236 to 356, shown at 206 to 326
+  select("commands");
+  assert.deepEqual(scrolls.at(-1), { left: 60, behavior: "auto" }, "revealed at once, as far as the strip scrolls");
+  assert.equal(scrolls.length, 2);
+
+  strip.scrollLeft = 0; // the user scrolls the strip back by hand
+  select("commands"); // same labels and counts
+  assert.equal(scrolls.length, 2, "a plain re-render does not undo the user's scroll");
+
+  // A filter changes a count: the tabs move again, so the selected tab is checked again.
+  relabel(zhTabs.map((tab) => (tab.id === "overworld" ? { ...tab, count: 12 } : tab)), [104, 80, 60, 120]);
+  select("commands");
+  assert.deepEqual(scrolls.at(-1), { left: 68, behavior: "auto" });
+
+  // Back to English with Commands still in view (as far as the strip scrolls): nothing moves.
+  relabel(WORLD_TABS, [96, 80, 60, 90]);
+  strip.scrollLeft = 30; // the browser clamps scrollLeft to the shorter content
+  select("commands");
+  assert.equal(scrolls.length, 3);
 });
 
 test("strip state: is-scrollable needs more than 1 px of overflow; each edge has the same 1 px tolerance", () => {
