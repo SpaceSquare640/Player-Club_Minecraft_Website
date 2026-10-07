@@ -16,7 +16,7 @@ Website: https://spacesquare640.github.io/Player-Club_Minecraft_Website/
 | --- | --- |
 | World info | World name, game version, seed and world spawn pinned at the top, each with one-click copy; world type and respawn radius when set |
 | Dimension tabs | Overworld, The Nether, The End |
-| Commands tab | Builder World: `/give` commands for enchanted tools, weapons and armor. Pick command block or chat, item name, symbols and colours, then copy; the settings are kept only while the page is open |
+| Commands tab | Builder World: `/give` commands for enchanted tools, weapons and armor. Pick chat or command block and an item name, then copy; to scramble the name in game, change `obfuscated:false` to `obfuscated:true` in the command. The settings are kept only while the page is open |
 | Point cards | Name, tags, X Y Z, note, submitter and last update; one-click copy of "X Y Z" |
 | Search and filter | Keyword search and tag filters; view state is stored in the URL for sharing |
 | Worlds and editions | Multiple worlds, Java Edition and Bedrock Edition, configured by data |
@@ -60,7 +60,7 @@ This repository does not keep a separate change log file. Site updates and coord
 
 A static website (HTML, CSS, JavaScript) with no framework. Coordinates and other data are stored as JSON, separated from the UI, and every data file carries a `schemaVersion`. GitHub Actions validates issue requests, writes data and deploys to GitHub Pages.
 
-The Commands tab appears for worlds marked `"commands": true` in `site/data/worlds.json`. Its data, `site/data/commands/<worldId>.json` (schema `schemas/v1/commands.schema.json`), stores only the item, enchantments, count and bilingual names; the page loads it when the tab is opened and builds each full command from the current settings. Commands are edited by the owner only, not through Issue forms.
+The Commands tab appears for worlds marked `"commands": true` in `site/data/worlds.json`. Its data, `site/data/commands/<worldId>.json` (schema `schemas/v1/commands.schema.json`), stores only the item, enchantments, an optional count and bilingual names; the page loads it when the tab is opened and builds each full command from the current settings. Commands are edited by the owner only, not through Issue forms.
 
 ```text
 .github/        Issue forms and GitHub Actions workflows
@@ -179,7 +179,7 @@ Player Club 社群的 Minecraft 世界座標網站。集中存放各世界的村
 | --- | --- |
 | 世界資訊 | 世界名稱、遊戲版本、Seed 與世界出生座標置頂顯示，可一鍵複製；世界類型與重生半徑（有設定時） |
 | 維度分頁 | 主世界、地獄、終界 |
-| 指令分頁 | Builder World：附魔工具、武器與裝備的 `/give` 指令。可選擇指令方塊或聊天欄、物品名稱、符號與顏色後複製；設定只在頁面開啟期間保留 |
+| 指令分頁 | Builder World：附魔工具、武器與裝備的 `/give` 指令。可選擇聊天欄或指令方塊與物品名稱後複製；想讓名稱在遊戲中顯示為亂碼，請把指令中的 `obfuscated:false` 改成 `obfuscated:true`。設定只在頁面開啟期間保留 |
 | 座標卡片 | 名稱、標籤、X Y Z、說明、提交者、更新時間；一鍵複製「X Y Z」 |
 | 搜尋與篩選 | 關鍵字搜尋與標籤篩選；畫面狀態寫入網址，可直接分享連結 |
 | 多世界與多版本 | 支援多個世界及 Java 版、基岩版，由資料設定 |
@@ -223,7 +223,7 @@ Player Club 社群的 Minecraft 世界座標網站。集中存放各世界的村
 
 純靜態網站（HTML、CSS、JavaScript），不使用框架。座標等資料以 JSON 存放並與介面分離，每個資料檔皆帶 `schemaVersion`。GitHub Actions 負責驗證 Issue 請求、寫入資料與部署至 GitHub Pages。
 
-`site/data/worlds.json` 中標示 `"commands": true` 的世界會顯示指令分頁。資料檔 `site/data/commands/<worldId>.json`（schema 為 `schemas/v1/commands.schema.json`）只存物品、附魔、數量與雙語名稱；開啟分頁時才載入，並依目前設定組出完整指令。指令只由擁有者編輯，不開放 Issue 表單申請。
+`site/data/worlds.json` 中標示 `"commands": true` 的世界會顯示指令分頁。資料檔 `site/data/commands/<worldId>.json`（schema 為 `schemas/v1/commands.schema.json`）只存物品、附魔、數量（可省略）與雙語名稱；開啟分頁時才載入，並依目前設定組出完整指令。指令只由擁有者編輯，不開放 Issue 表單申請。
 
 ```text
 .github/        Issue 表單與 GitHub Actions workflows
