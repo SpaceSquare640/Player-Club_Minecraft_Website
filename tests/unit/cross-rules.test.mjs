@@ -487,6 +487,14 @@ test("X25 commands: one item is adjacent, with the same label and distinct varia
     ["/commands/0", "diamond_axe_fortune: variant is required when diamond_axe has more than one command"],
   ]);
   assert.deepEqual(issuesOf((c) => { c[1].variant = { en: "Fortune", "zh-TW": "時運二" }; }), [["/commands/1/variant/en", "Duplicate variant Fortune for diamond_axe"]]);
+  assert.deepEqual(issuesOf((c) => { c[1].variant = { en: "Fortune II", "zh-TW": "時運" }; }), [
+    ["/commands/1/variant/zh-TW", "Duplicate zh-TW variant 時運 for diamond_axe"],
+  ], "variants must also differ in Traditional Chinese");
+  assert.deepEqual(issuesOf((c) => { c[1].variant = { ...c[0].variant }; }), [
+    ["/commands/1/variant/en", "Duplicate variant Fortune for diamond_axe"],
+    ["/commands/1/variant/zh-TW", "Duplicate zh-TW variant 時運 for diamond_axe"],
+  ]);
+  assert.deepEqual(issuesOf((c) => { c[2].variant = { en: "Fortune", "zh-TW": "時運" }; }), [], "the same variant on another item is allowed");
   assert.deepEqual(issuesOf((c) => { c[2].variant = { en: "Plain", "zh-TW": "普通" }; }), [], "a variant on a single command is allowed");
 });
 

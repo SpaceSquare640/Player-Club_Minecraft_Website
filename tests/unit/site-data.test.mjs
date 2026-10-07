@@ -15,6 +15,22 @@ test("site data loads and validates without errors", () => {
   assert.equal(result.crossSkipped, false);
 });
 
+test("Builder World commands: variants of one item differ in en and in zh-TW (X25)", () => {
+  const byItem = new Map();
+  for (const entry of dataset.commands.builder_world.commands) {
+    if (!entry.variant) continue;
+    const seen = byItem.get(entry.item) ?? { en: new Set(), "zh-TW": new Set() };
+    for (const lang of ["en", "zh-TW"]) {
+      assert.ok(!seen[lang].has(entry.variant[lang]), `${entry.id} ${lang}: ${entry.variant[lang]}`);
+      seen[lang].add(entry.variant[lang]);
+    }
+    byItem.set(entry.item, seen);
+  }
+  assert.ok([...byItem.values()].some((seen) => seen.en.size > 1), "at least one item has several variants");
+  const result = validateDataset(dataset, { fileIssues: issues });
+  assert.deepEqual(result.errors.filter((e) => e.code === "X25"), []);
+});
+
 test("first batch: manifest sequences, world, spawn and seed", () => {
   // Sequences only grow as points and entries are added (approved requests or owner edits),
   // so the first-batch values are a floor, not a fixed snapshot.

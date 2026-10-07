@@ -258,7 +258,8 @@ export function runCrossRules(dataset, options = {}) {
   }
 
   // X25 commands files: one per world with commands: true, worldId equals file name, unique ids,
-  // valid enchantment lists, and commands of one item adjacent with the same label and distinct variants.
+  // valid enchantment lists, and commands of one item adjacent with the same label and variants distinct
+  // in en and in zh-TW.
   // Shapes (item, enchantments text, count, labels) are checked by the schema.
   const commandFiles = dataset.commands ?? {};
   for (const world of worlds.worlds) {
@@ -306,10 +307,14 @@ export function runCrossRules(dataset, options = {}) {
         if (!entry.variant) {
           error("X25", fpath, base, `${entry.id}: variant is required when ${entry.item} has more than one command`);
         } else {
-          const seenVariants = variantsByItem.get(entry.item) ?? new Set();
-          if (seenVariants.has(entry.variant.en)) error("X25", fpath, `${base}/variant/en`, `Duplicate variant ${entry.variant.en} for ${entry.item}`);
-          seenVariants.add(entry.variant.en);
-          variantsByItem.set(entry.item, seenVariants);
+          // Variants tell the commands of one item apart in both languages, so each language must be unique.
+          const seen = variantsByItem.get(entry.item) ?? { en: new Set(), "zh-TW": new Set() };
+          const { en, "zh-TW": zh } = entry.variant;
+          if (seen.en.has(en)) error("X25", fpath, `${base}/variant/en`, `Duplicate variant ${en} for ${entry.item}`);
+          if (seen["zh-TW"].has(zh)) error("X25", fpath, `${base}/variant/zh-TW`, `Duplicate zh-TW variant ${zh} for ${entry.item}`);
+          seen.en.add(en);
+          seen["zh-TW"].add(zh);
+          variantsByItem.set(entry.item, seen);
         }
       }
     });
