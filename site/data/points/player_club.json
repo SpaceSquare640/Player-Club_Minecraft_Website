@@ -282,19 +282,6 @@
       "submittedBy": "SpaceSquare640",
       "createdAt": "2026-10-04T04:06:14Z",
       "updatedAt": "2026-10-04T04:06:14Z"
-    },
-    {
-      "id": "p0033",
-      "dimension": "overworld",
-      "name": "Testing",
-      "tags": ["other"],
-      "x": 68328,
-      "y": 72,
-      "z": -81237,
-      "note": "Webhook testing",
-      "submittedBy": "SpaceSquare640",
-      "createdAt": "2026-10-08T07:21:01Z",
-      "updatedAt": "2026-10-08T07:21:01Z"
     }
   ]
 }

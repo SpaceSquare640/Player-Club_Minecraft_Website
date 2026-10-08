@@ -956,6 +956,30 @@
         "type": "issue",
         "issue": 42
       }
+    },
+    {
+      "id": "c0041",
+      "date": "2026-10-08",
+      "action": "delete",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0033",
+        "dimension": "overworld",
+        "name": "Testing"
+      },
+      "summary": {
+        "en": "Removed point: Testing",
+        "zh-TW": "刪除座標：Testing"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 43
+      }
     }
   ]
 }
