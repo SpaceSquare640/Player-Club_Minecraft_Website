@@ -932,6 +932,30 @@
         "type": "issue",
         "issue": 41
       }
+    },
+    {
+      "id": "c0040",
+      "date": "2026-10-08",
+      "action": "add",
+      "target": {
+        "type": "point",
+        "worldId": "player_club",
+        "id": "p0033",
+        "dimension": "overworld",
+        "name": "Testing"
+      },
+      "summary": {
+        "en": "Added point: Testing",
+        "zh-TW": "新增座標：Testing"
+      },
+      "scope": {
+        "en": "Point data: Player_Club / Overworld",
+        "zh-TW": "座標資料：Player_Club／主世界"
+      },
+      "source": {
+        "type": "issue",
+        "issue": 42
+      }
     }
   ]
 }
